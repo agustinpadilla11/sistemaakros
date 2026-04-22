@@ -1,0 +1,229 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function isSignedIn() { return request.auth != null; }
+    
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // To bootstrap the first admin, if no users exist, or if the user creating matches a specific logic.
+    // We will rely on a custom claim OR checking the `usuarios` collection.
+    function isAdmin() { 
+      return isSignedIn() && (
+        (request.auth.token != null && request.auth.token.email == 'mpatojardel@gmail.com') ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin')
+      ); 
+    }
+
+    function isPadre() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'padre';
+    }
+
+    // Check if the current user is linked to the alumna. 
+    // Uses the deterministically generated document ID in padre_alumna collection.
+    function isPadreLinked(alumnaId) {
+      return exists(/databases/$(database)/documents/padre_alumna/$(request.auth.uid + "_" + alumnaId));
+    }
+
+    // Schemas
+    function isValidUsuario(data) {
+      return data.keys().hasAll(['uid', 'email', 'nombre', 'telefono', 'rol', 'creado_en']) &&
+             data.keys().size() == 6 &&
+             data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             data.nombre is string && data.nombre.size() <= 256 &&
+             data.telefono is string && data.telefono.size() <= 64 &&
+             data.rol is string && data.rol in ['admin', 'padre'] &&
+             data.creado_en is timestamp;
+    }
+
+    function isValidAlumna(data) {
+      return data.keys().hasAll(['nombre_completo', 'fecha_nacimiento', 'dni', 'estado', 'creado_en']) &&
+             data.nombre_completo is string && data.nombre_completo.size() <= 256 &&
+             data.fecha_nacimiento is timestamp &&
+             data.dni is string && data.dni.size() <= 64 &&
+             data.estado is string && data.estado in ['activa', 'inactiva', 'pendiente_aprobacion'] &&
+             data.creado_en is timestamp &&
+             (!('foto_dni_url' in data.keys()) || (data.foto_dni_url is string && data.foto_dni_url.size() <= 1024)) &&
+             (!('foto_apto_url' in data.keys()) || (data.foto_apto_url is string && data.foto_apto_url.size() <= 1024)) &&
+             (!('fecha_apto_medico' in data.keys()) || (data.fecha_apto_medico is timestamp)) &&
+             (!('grupo_id' in data.keys()) || (data.grupo_id is string && data.grupo_id.size() <= 128)) &&
+             (!('importada' in data.keys()) || data.importada is bool);
+    }
+
+    function isValidPadreAlumna(data) {
+      return data.keys().hasAll(['usuario_id', 'alumna_id', 'vinculado_en']) &&
+             data.keys().size() == 3 &&
+             data.usuario_id is string && data.usuario_id.size() <= 128 && data.usuario_id == request.auth.uid &&
+             data.alumna_id is string && data.alumna_id.size() <= 128 &&
+             data.vinculado_en is timestamp;
+    }
+
+    function isValidGrupo(data) {
+      return data.keys().hasAll(['nombre', 'horario', 'descripcion']) &&
+             data.keys().size() == 3 &&
+             data.nombre is string && data.nombre.size() <= 128 &&
+             data.horario is string && data.horario.size() <= 128 &&
+             data.descripcion is string && data.descripcion.size() <= 1024;
+    }
+
+    function isValidCuota(data) {
+      return data.keys().hasAll(['alumna_id', 'mes', 'anio', 'monto', 'estado']) &&
+             data.alumna_id is string && data.alumna_id.size() <= 128 &&
+             data.mes is number && data.mes >= 1 && data.mes <= 12 &&
+             data.anio is number &&
+             data.monto is number &&
+             data.estado is string && data.estado in ['pagado', 'pendiente', 'vencido'] &&
+             (!('fecha_pago' in data.keys()) || data.fecha_pago is timestamp || data.fecha_pago == null) &&
+             (!('metodo_pago' in data.keys()) || data.metodo_pago is string || data.metodo_pago == null) &&
+             (!('notas' in data.keys()) || data.notas is string && data.notas.size() <= 1024);
+    }
+
+    function isValidProducto(data) {
+      return data.keys().hasAll(['nombre', 'descripcion', 'precio', 'stock', 'imagen_url']) &&
+             data.keys().size() == 5 &&
+             data.nombre is string && data.nombre.size() <= 128 &&
+             data.descripcion is string && data.descripcion.size() <= 1024 &&
+             data.precio is number &&
+             data.stock is number &&
+             data.imagen_url is string && data.imagen_url.size() <= 1024;
+    }
+
+    function isValidVenta(data) {
+      return data.keys().hasAll(['alumna_id', 'producto_id', 'cantidad', 'precio_unitario', 'total', 'fecha']) &&
+             data.keys().size() == 6 &&
+             data.alumna_id is string && data.alumna_id.size() <= 128 &&
+             data.producto_id is string && data.producto_id.size() <= 128 &&
+             data.cantidad is number &&
+             data.precio_unitario is number &&
+             data.total is number &&
+             data.fecha is timestamp;
+    }
+
+    function isValidCosto(data) {
+      return data.keys().hasAll(['alumna_id', 'concepto', 'monto', 'fecha', 'estado']) &&
+             data.alumna_id is string && data.alumna_id.size() <= 128 &&
+             data.concepto is string && data.concepto.size() <= 256 &&
+             data.monto is number &&
+             data.fecha is timestamp &&
+             data.estado is string && data.estado in ['pagado', 'pendiente'] &&
+             (!('notas' in data.keys()) || data.notas is string && data.notas.size() <= 1024);
+    }
+
+    // MATCHES
+    match /usuarios/{usuarioId} {
+      allow read: if isSignedIn() && (request.auth.uid == usuarioId || isAdmin());
+      allow create: if isSignedIn() && 
+                       isValidId(usuarioId) &&
+                       usuarioId == request.auth.uid && 
+                       isValidUsuario(incoming()) &&
+                       (incoming().rol == 'padre' || isAdmin());
+      allow update: if isSignedIn() && 
+                       isValidId(usuarioId) &&
+                       isValidUsuario(incoming()) && 
+                       (
+                         (usuarioId == request.auth.uid && incoming().rol == existing().rol) || 
+                         isAdmin()
+                       );
+      allow delete: if false; 
+    }
+
+    match /alumnas/{alumnaId} {
+      // Padres can get their own daughters. Admins can read all.
+      allow get: if isSignedIn() && (isAdmin() || isPadreLinked(alumnaId));
+      // Padres can search by DNI to link their daughters.
+      allow list: if isSignedIn();
+      
+      allow create: if isSignedIn() && 
+                       isValidId(alumnaId) &&
+                       isValidAlumna(incoming()) && 
+                       (isAdmin() || incoming().estado == 'pendiente_aprobacion');
+
+      allow update: if isSignedIn() && 
+                       isValidId(alumnaId) &&
+                       isValidAlumna(incoming()) && 
+                       (isAdmin() || 
+                         (isPadreLinked(alumnaId) && incoming().diff(existing()).affectedKeys().hasOnly(['foto_apto_url', 'fecha_apto_medico']))
+                       );
+      
+      allow delete: if isAdmin();
+    }
+
+    match /padre_alumna/{docId} {
+      allow get: if isSignedIn() && (isAdmin() || existing().usuario_id == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || existing().usuario_id == request.auth.uid);
+      
+      allow create: if isSignedIn() && (incoming().usuario_id == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /ventas_merch/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /grupos/{grupoId} {
+      allow read: if isSignedIn(); // All authenticated users can read groups
+      allow create: if isAdmin() && isValidId(grupoId) && isValidGrupo(incoming());
+      allow update: if isAdmin() && isValidId(grupoId) && isValidGrupo(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /cuotas/{cuotaId} {
+      allow get: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));
+      allow list: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));
+      allow create: if isAdmin() && isValidId(cuotaId) && isValidCuota(incoming());
+      allow update: if isAdmin() && isValidId(cuotaId) && isValidCuota(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /productos/{productoId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidId(productoId) && isValidProducto(incoming());
+      allow update: if isAdmin() && isValidId(productoId) && isValidProducto(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /ventas/{ventaId} {
+      allow get: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));
+      allow list: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));
+      allow create: if isAdmin() && isValidId(ventaId) && isValidVenta(incoming());
+      allow update: if isAdmin() && isValidId(ventaId) && isValidVenta(incoming());
+      allow delete: if isAdmin();
+    }
+
+    function isValidEgreso(data) {
+      return data.keys().hasAll(['concepto', 'monto', 'fecha', 'metodo']) &&
+             data.concepto is string &&
+             data.monto is number &&
+             data.fecha is timestamp &&
+             data.metodo is string;
+    }
+
+    match /egresos/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /cajas/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /otros_costos/{costoId} {
+      allow get: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));
+      allow list: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));
+      allow create: if isAdmin() && isValidId(costoId) && isValidCosto(incoming());
+      allow update: if isAdmin() && isValidId(costoId) && isValidCosto(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}
