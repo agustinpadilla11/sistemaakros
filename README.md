@@ -26,4 +26,7 @@ Este proyecto es una aplicación web para la gestión de un gimnasio de gimnasia
 ## Cómo usar la carga masiva CSV
 Andá a "Alumnas > Importar CSV".
 Abrí el archivo adjunto `datos_ejemplo.csv`, copiá todo el contenido, pegalo en la caja de texto y procesá la importación.
-Automáticamente se crearán las fichas de esas alumnas y las 12 cuotas anuales respectivas.
+## Nuevas Funcionalidades (Abril 2026)
+- **Identidad Visual**: Implementación de logo oficial en Login, Admin y Portal Padre, además de Favicon.
+- **Gestión de Documentos**: Sistema de carga de fotos (Carnet, DNI, Certificado Médico) con compresión automática en el navegador para máxima velocidad.
+- **Carga de Archivos**: Botones específicos en la Ficha de la Alumna para gestionar documentación adjunta.
