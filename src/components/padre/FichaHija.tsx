@@ -245,15 +245,41 @@ export default function FichaHija() {
                 const isExento = mesIndex <= 4;
                 const isLate = today.getDate() > 15 && mesIndex === (today.getMonth() + 1);
 
-                if (!c && isExento) {
+                // Si está pagado, siempre mostramos como PAGADO para ver detalles
+                const isPagado = c && c.estado === 'pagado';
+                
+                if (isPagado) {
                   return (
-                    <div key={m} className="p-3 border rounded text-center bg-slate-50 border-slate-100 opacity-50">
-                      <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">{m}</div>
-                      <div className="text-[9px] font-black text-slate-300">EXENTO</div>
+                    <div 
+                      key={m} 
+                      onClick={() => setSelectedCuotaDetail(c)}
+                      className="p-3 border rounded text-center cursor-pointer transition-all hover:scale-105 bg-emerald-50 border-emerald-200 shadow-sm shadow-emerald-100"
+                    >
+                      <div className="text-[10px] uppercase font-bold tracking-widest mb-1 text-emerald-700">{m}</div>
+                      <div className="text-[9px] font-black flex items-center justify-center gap-1 text-emerald-700">
+                        <CheckCircle className="w-2.5 h-2.5"/> PAGADO
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setSelectedCuotaDetail(c); }}
+                        className="mt-2 w-full py-1 rounded bg-emerald-600 text-white text-[8px] font-black uppercase tracking-tighter hover:bg-emerald-700 transition-colors"
+                      >
+                        Ver Detalles
+                      </button>
                     </div>
                   );
                 }
 
+                // Si no está pagado pero es exento (Ene-Abr)
+                if (isExento) {
+                  return (
+                    <div key={m} className="p-3 border rounded text-center bg-slate-50 border-slate-100 opacity-60">
+                      <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1">{m}</div>
+                      <div className="text-[9px] font-black text-slate-400">EXENTO</div>
+                    </div>
+                  );
+                }
+
+                // Si no hay registro y no es exento
                 if (!c) {
                   const isDeuda = mesIndex <= (today.getMonth() + 1);
                   return (
@@ -266,34 +292,23 @@ export default function FichaHija() {
                   );
                 }
 
-                const isPagado = c.estado === 'pagado';
-                const isVencido = c.estado === 'vencido' || (!isPagado && isLate);
+                // Si hay registro (pendiente/vencido) y no es exento
+                const isVencido = c.estado === 'vencido' || isLate;
 
                 return (
                   <div 
                     key={m} 
-                    onClick={() => isPagado && setSelectedCuotaDetail(c)}
-                    className={`p-3 border rounded text-center cursor-pointer transition-all hover:scale-105 ${
-                    isPagado ? 'bg-emerald-50 border-emerald-200 shadow-sm shadow-emerald-100' :
+                    className={`p-3 border rounded text-center transition-all ${
                     isVencido ? 'bg-red-50 border-red-200 animate-pulse' : 'bg-amber-50 border-amber-200'
                   }`}>
                     <div className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${
-                      isPagado ? 'text-emerald-700' : isVencido ? 'text-red-700' : 'text-amber-700'
+                      isVencido ? 'text-red-700' : 'text-amber-700'
                     }`}>{m}</div>
                     <div className={`text-[9px] font-black flex items-center justify-center gap-1 ${
-                      isPagado ? 'text-emerald-700' : isVencido ? 'text-red-700' : 'text-amber-700'
+                      isVencido ? 'text-red-700' : 'text-amber-700'
                     }`}>
-                      {isPagado ? <><CheckCircle className="w-2.5 h-2.5"/> PAGADO</> : 
-                       isVencido ? <><AlertCircle className="w-2.5 h-2.5"/> DEUDA</> : 'PDTE'}
+                      {isVencido ? <><AlertCircle className="w-2.5 h-2.5"/> DEUDA</> : 'PDTE'}
                     </div>
-                    {isPagado && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setSelectedCuotaDetail(c); }}
-                        className="mt-2 w-full py-1 rounded bg-emerald-600 text-white text-[8px] font-black uppercase tracking-tighter hover:bg-emerald-700 transition-colors"
-                      >
-                        Ver Detalles
-                      </button>
-                    )}
                   </div>
                 );
               })}
