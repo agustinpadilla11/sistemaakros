@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebase/config';
+import { db } from '../../firebase/config';
+import { supabase } from '../../supabase/config';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { Camera, FileText, CheckCircle2, UploadCloud, X } from 'lucide-react';
 
 export default function NuevaInscripcion() {
   const { userData } = useAuth();
+  if (!userData) return null;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -34,23 +36,44 @@ export default function NuevaInscripcion() {
     certificado_medico: null,
   });
 
+  const [previews, setPreviews] = useState<{ [key: string]: string }>({});
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
     if (e.target.files && e.target.files[0]) {
-      setFiles({ ...files, [fieldName]: e.target.files[0] });
+      const file = e.target.files[0];
+      setFiles({ ...files, [fieldName]: file });
+      
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviews(prev => ({ ...prev, [fieldName]: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setPreviews(prev => ({ ...prev, [fieldName]: 'pdf' }));
+      }
     }
   };
 
   const uploadFile = async (file: File, folder: string, filename: string): Promise<string> => {
     try {
-      const storageRef = ref(storage, `${folder}/${Date.now()}_${filename}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      return downloadURL;
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${folder}/${Date.now()}_${filename}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('alumnas')
+        .upload(filePath, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('alumnas')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
     } catch (err) {
-      console.warn("Storage upload failed, falling back to null for:", filename, err);
-      // Fallback: If storage fails due to permissions, we just return empty string to avert complete failure of the form
+      console.error("Supabase upload failed for:", filename, err);
       return '';
     }
   };
@@ -215,23 +238,53 @@ export default function NuevaInscripcion() {
           <section className="space-y-4">
             <h2 className="text-sm font-black text-purple-700 uppercase tracking-widest bg-purple-50 p-2 rounded">Archivos Adjuntos</h2>
             <p className="text-[10px] font-bold text-slate-400 mb-4 tracking-widest uppercase">Solo se admite un archivo por campo (Imagen o PDF corto).</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <label className="block text-[10px] uppercase font-bold text-slate-600 tracking-widest mb-2">Foto DNI Frente <span className="text-red-500">*</span></label>
-                <input type="file" required accept="image/*,application/pdf" onChange={e => handleFileChange(e, 'foto_dni_frente')} className="text-xs" />
-              </div>
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <label className="block text-[10px] uppercase font-bold text-slate-600 tracking-widest mb-2">Foto DNI Dorso <span className="text-red-500">*</span></label>
-                <input type="file" required accept="image/*,application/pdf" onChange={e => handleFileChange(e, 'foto_dni_dorso')} className="text-xs" />
-              </div>
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <label className="block text-[10px] uppercase font-bold text-slate-600 tracking-widest mb-2">Foto Gimnasta <span className="text-red-500">*</span></label>
-                <input type="file" required accept="image/*" onChange={e => handleFileChange(e, 'foto_gimnasta')} className="text-xs" />
-              </div>
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <label className="block text-[10px] uppercase font-bold text-slate-600 tracking-widest mb-2">Certificado de Aptitud <span className="text-red-500">*</span></label>
-                <input type="file" required accept="image/*,application/pdf" onChange={e => handleFileChange(e, 'certificado_medico')} className="text-xs" />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { id: 'foto_dni_frente', label: 'DNI Frente', icon: <FileText className="w-5 h-5"/> },
+                { id: 'foto_dni_dorso', label: 'DNI Dorso', icon: <FileText className="w-5 h-5"/> },
+                { id: 'foto_gimnasta', label: 'Foto Perfil', icon: <Camera className="w-5 h-5"/>, accept: "image/*" },
+                { id: 'certificado_medico', label: 'Certificado Med.', icon: <FileText className="w-5 h-5"/> }
+              ].map((item) => (
+                <div key={item.id} className="relative group">
+                   <div className={`h-40 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-4 text-center ${
+                     files[item.id] ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:border-purple-300'
+                   }`}>
+                      {previews[item.id] ? (
+                        previews[item.id] === 'pdf' ? (
+                          <div className="flex flex-col items-center gap-2">
+                             <FileText className="w-10 h-10 text-emerald-600" />
+                             <span className="text-[9px] font-black uppercase text-emerald-700 truncate w-32">{files[item.id]?.name}</span>
+                          </div>
+                        ) : (
+                          <img src={previews[item.id]} alt="preview" className="w-full h-full object-cover rounded-lg" />
+                        )
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                           {item.icon}
+                           <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+                           <UploadCloud className="w-4 h-4 opacity-30 mt-1" />
+                        </div>
+                      )}
+                      
+                      <input 
+                        type="file" 
+                        required={!files[item.id]}
+                        accept={item.accept || "image/*,application/pdf"} 
+                        onChange={e => handleFileChange(e, item.id)} 
+                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                      />
+
+                      {files[item.id] && (
+                        <div className="absolute top-2 right-2 bg-emerald-500 text-white rounded-full p-1 shadow-lg">
+                           <CheckCircle2 className="w-3 h-3" />
+                        </div>
+                      )}
+                   </div>
+                   {files[item.id] && (
+                     <p className="text-[8px] font-bold text-emerald-600 mt-1 text-center uppercase">¡Listo!</p>
+                   )}
+                </div>
+              ))}
             </div>
           </section>
 

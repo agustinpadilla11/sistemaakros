@@ -225,5 +225,27 @@ service cloud.firestore {
       allow update: if isAdmin() && isValidId(costoId) && isValidCosto(incoming());
       allow delete: if isAdmin();
     }
+
+    match /torneos_lista/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /torneos_pagos/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /licencias/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /inscripciones_fed/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /matriculas/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /seguros/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /bajas/{docId} {
+      allow read, write: if isAdmin();
+    }
   }
 }

@@ -7,6 +7,7 @@ import { UserCircle, AlertCircle } from 'lucide-react';
 
 export default function PortalPadre() {
   const { userData } = useAuth();
+  if (!userData) return null;
   const [alumnas, setAlumnas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db, storage } from '../../firebase/config';
+import { db } from '../../firebase/config';
+import { supabase } from '../../supabase/config';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ChevronLeft, Upload, CheckCircle, AlertCircle, File, Image as ImageIcon, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -101,19 +101,25 @@ export default function ImportarDocumentos() {
        setTasks(prev => prev.map(p => p.id === task.id ? { ...p, status: 'uploading' } : p));
        
        try {
-         const timestamp = Date.now();
-         const cleanFileName = task.file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-         const extension = task.file.name.split('.').pop();
-         const finalName = `${timestamp}_${task.tipo}.${extension}`;
-         
-         const storageRef = ref(storage, `alumnas/${task.alumnaId}/${finalName}`);
-         const snapshot = await uploadBytes(storageRef, task.file);
-         const downloadUrl = await getDownloadURL(snapshot.ref);
-         
-         const updatePayload: any = {};
-         updatePayload[`${task.tipo}_url`] = downloadUrl;
-         
-         await updateDoc(doc(db, 'alumnas', task.alumnaId), updatePayload);
+           const timestamp = Date.now();
+           const extension = task.file.name.split('.').pop();
+           const finalName = `${task.tipo}.${extension}`;
+           const filePath = `${task.alumnaId}/${timestamp}_${finalName}`;
+           
+           const { error: uploadError } = await supabase.storage
+             .from('alumnas')
+             .upload(filePath, task.file);
+
+           if (uploadError) throw uploadError;
+
+           const { data: { publicUrl } } = supabase.storage
+             .from('alumnas')
+             .getPublicUrl(filePath);
+           
+           const updatePayload: any = {};
+           updatePayload[`${task.tipo}_url`] = publicUrl;
+           
+           await updateDoc(doc(db, 'alumnas', task.alumnaId), updatePayload);
          
          setTasks(prev => prev.map(p => p.id === task.id ? { ...p, status: 'success' } : p));
        } catch (err: any) {

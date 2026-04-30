@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Plus, Edit, Trash2, ShoppingBag, Package, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, ShoppingBag, Package, Calendar, ChevronLeft, ChevronRight, Printer, CheckCircle2, Clock } from 'lucide-react';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-export default function Merchandising() {
+export default function Indumentaria() {
   const [activeTab, setActiveTab] = useState<'pedidos' | 'catalogo'>('pedidos');
   
   // Data states
@@ -25,6 +25,8 @@ export default function Merchandising() {
   const [deleteConfirmPedidoId, setDeleteConfirmPedidoId] = useState<string | null>(null);
   const [deleteConfirmCatalogoId, setDeleteConfirmCatalogoId] = useState<string | null>(null);
   const [isEditingPedido, setIsEditingPedido] = useState<any>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printFilter, setPrintFilter] = useState('todas');
   
   const [formCatalogo, setFormCatalogo] = useState({ nombre: '', descripcion: '', precio: '', stock: '', imagen_url: '' });
   const [formPedido, setFormPedido] = useState({
@@ -40,15 +42,12 @@ export default function Merchandising() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Alumnas
       const aluSnap = await getDocs(collection(db, 'alumnas'));
       setTodasAlumnas(aluSnap.docs.map(d => ({id: d.id, ...d.data()})));
       
-      // 2. Catalogo
       const prodSnap = await getDocs(collection(db, 'productos'));
       setProductos(prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       
-      // 3. Pedidos (ventas_merch)
       const pedSnap = await getDocs(collection(db, 'ventas_merch'));
       const pedData = pedSnap.docs.map(doc => {
          const data = doc.data();
@@ -60,7 +59,7 @@ export default function Merchandising() {
          }
          return { id: doc.id, ...data, dateObj, timestamp: dateObj.getTime() };
       });
-      pedData.sort((a,b) => b.timestamp - a.timestamp); // Descending
+      pedData.sort((a,b) => b.timestamp - a.timestamp);
       setPedidos(pedData);
       
     } catch (err) {
@@ -80,13 +79,12 @@ export default function Merchandising() {
     });
   };
 
-  // Guardar Pedido
   const handleSavePedido = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const payload = {
         alumna_nombre: formPedido.alumna_nombre,
-        concepto: formPedido.prenda, // para compatibilidad con caja
+        concepto: formPedido.prenda,
         prenda: formPedido.prenda,
         talle: formPedido.talle,
         monto: parseFloat(formPedido.monto.toString()) || 0,
@@ -94,16 +92,15 @@ export default function Merchandising() {
         metodo: formPedido.metodo,
         estado_entrega: formPedido.estado,
         fecha: new Date(),
-        tipo: 'merch' // identificador para caja
+        tipo: 'merch'
       };
 
       if (isEditingPedido === 'nuevo') {
         const newRef = doc(collection(db, 'ventas_merch'));
         await setDoc(newRef, { id: newRef.id, ...payload });
       } else {
-        // En edición, no pisamos la fecha original a menos que queramos
         const editPayload = { ...payload };
-        delete (editPayload as any).fecha; // Mantenemos la fecha original
+        delete (editPayload as any).fecha;
         await updateDoc(doc(db, 'ventas_merch', isEditingPedido.id), editPayload);
       }
       setIsEditingPedido(null);
@@ -114,7 +111,6 @@ export default function Merchandising() {
     }
   };
 
-  // Guardar Catalogo
   const handleSaveCatalogo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -162,28 +158,71 @@ export default function Merchandising() {
 
   const handleToggleEstado = async (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'entregado' ? 'no entregado' : 'entregado';
-    // Actualización optimista para UX súper veloz
     setPedidos(prev => prev.map(p => p.id === id ? { ...p, estado_entrega: newStatus } : p));
     try {
       await updateDoc(doc(db, 'ventas_merch', id), { estado_entrega: newStatus });
     } catch (err) {
       console.error(err);
-      loadData(); // Revert on failure
+      loadData();
     }
   };
   
-  // Filtrar pedidos por el mes seleccionado
   const pedidosMes = pedidos.filter(p => {
      return p.dateObj.getMonth() === currentMonthDate.getMonth() && 
             p.dateObj.getFullYear() === currentMonthDate.getFullYear();
   });
 
+  const uniquePrendas = Array.from(new Set(pedidosMes.map(p => p.prenda))).filter(Boolean).sort();
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const filteredPrintList = printFilter === 'todas' 
+    ? pedidosMes 
+    : pedidosMes.filter(p => p.prenda === printFilter);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      {/* Print View Only */}
+      <div className="hidden print:block bg-white p-8">
+        <div className="flex justify-between items-center border-b-2 border-purple-900 pb-4 mb-6">
+           <img src="/logo.png" className="h-12" alt="Logo" />
+           <div className="text-right">
+              <h1 className="text-xl font-black uppercase text-purple-900">Lista de Pedidos - Indumentaria</h1>
+              <p className="text-sm font-bold text-slate-500 uppercase">{printFilter === 'todas' ? 'Todos los artículos' : `Artículo: ${printFilter}`}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">{MESES[currentMonthDate.getMonth()]} {currentMonthDate.getFullYear()}</p>
+           </div>
+        </div>
+        <table className="w-full text-left border-collapse">
+           <thead>
+              <tr className="bg-slate-100 border-b border-slate-300">
+                 <th className="p-2 text-[10px] font-black uppercase">Gimnasta</th>
+                 <th className="p-2 text-[10px] font-black uppercase">Prenda</th>
+                 <th className="p-2 text-[10px] font-black uppercase text-center">Talle</th>
+                 <th className="p-2 text-[10px] font-black uppercase text-right">Estado</th>
+              </tr>
+           </thead>
+           <tbody>
+              {filteredPrintList.sort((a,b) => a.prenda.localeCompare(b.prenda)).map((p, i) => (
+                 <tr key={i} className="border-b border-slate-100">
+                    <td className="p-2 text-xs font-bold uppercase">{p.alumna_nombre}</td>
+                    <td className="p-2 text-xs font-bold uppercase text-purple-700">{p.prenda}</td>
+                    <td className="p-2 text-xs font-black uppercase text-center">{p.talle || '-'}</td>
+                    <td className="p-2 text-[10px] font-bold uppercase text-right">{p.estado_entrega}</td>
+                 </tr>
+              ))}
+           </tbody>
+        </table>
+        <div className="mt-8 pt-4 border-t border-slate-200 text-center">
+           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Generado el {new Date().toLocaleDateString('es-AR')} - Sistema Akros</p>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm print:hidden">
         <h1 className="text-sm font-bold uppercase tracking-tight flex items-center gap-2">
            <ShoppingBag className="w-5 h-5 text-purple-600" />
-           Merchandising & Pedidos
+           Indumentaria & Pedidos
         </h1>
         <div className="flex bg-slate-100 p-1 rounded-lg">
            <button 
@@ -203,11 +242,11 @@ export default function Merchandising() {
 
       {/* ----------------- TAB PEDIDOS ----------------- */}
       {activeTab === 'pedidos' && (
-         <div className="space-y-6">
+         <div className="space-y-6 print:hidden">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center gap-4">
                  <h2 className="text-sm font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
-                   <Calendar className="w-4 h-4 text-purple-600" /> Historial de Pedidos del Mes
+                   <Calendar className="w-4 h-4 text-purple-600" /> Historial de Pedidos
                  </h2>
                  <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg shadow-inner border border-slate-200/60">
                     <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-white rounded transition-colors text-slate-600" title="Mes anterior">
@@ -221,25 +260,67 @@ export default function Merchandising() {
                     </button>
                  </div>
               </div>
-              <button 
-                onClick={() => { 
-                  setFormPedido({alumna_nombre: '', prenda: '', talle: '', monto: '', observacion: '', metodo: 'efectivo', estado: 'no entregado'}); 
-                  setIsEditingPedido('nuevo'); 
-                }}
-                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <Plus className="w-3 h-3" /> Nuevo Pedido
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowPrintModal(true)}
+                  className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-slate-700 transition-colors shadow-sm"
+                >
+                  <Printer className="w-3 h-3" /> Imprimir Lista
+                </button>
+                <button 
+                  onClick={() => { 
+                    setFormPedido({alumna_nombre: '', prenda: '', talle: '', monto: '', observacion: '', metodo: 'efectivo', estado: 'no entregado'}); 
+                    setIsEditingPedido('nuevo'); 
+                  }}
+                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors shadow-sm"
+                >
+                  <Plus className="w-3 h-3" /> Nuevo Pedido
+                </button>
+              </div>
             </div>
+
+            {showPrintModal && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-purple-900 text-white">
+                    <h3 className="text-sm font-black uppercase tracking-widest">Generar Lista de Impresión</h3>
+                    <button onClick={() => setShowPrintModal(false)} className="text-purple-200 hover:text-white">✕</button>
+                  </div>
+                  <div className="p-8 space-y-6">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">¿Qué prenda desea imprimir?</label>
+                      <select 
+                        value={printFilter} 
+                        onChange={e => setPrintFilter(e.target.value)}
+                        className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-purple-500 focus:border-purple-500 uppercase"
+                      >
+                        <option value="todas">Todas las prendas</option>
+                        {uniquePrendas.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                      <p className="text-[10px] text-amber-700 font-bold uppercase leading-relaxed">
+                        Se generará una lista ordenada con el nombre de la gimnasta, prenda y talle para los {filteredPrintList.length} pedidos encontrados.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => setShowPrintModal(false)} className="flex-1 px-6 py-3 bg-slate-100 rounded-xl text-slate-600 text-[10px] uppercase font-bold tracking-widest hover:bg-slate-200 transition-colors">Cerrar</button>
+                      <button onClick={handlePrint} className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl shadow-lg shadow-purple-200 text-[10px] uppercase font-bold tracking-widest hover:bg-purple-700 transition-colors flex items-center justify-center gap-2">
+                        <Printer className="w-4 h-4" /> Imprimir Ahora
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {isEditingPedido && (
               <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
                 <h2 className="text-sm font-black uppercase tracking-tight mb-4 text-purple-900">{isEditingPedido === 'nuevo' ? 'Registrar' : 'Editar'} Pedido</h2>
                 <form onSubmit={handleSavePedido} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Fila 1 */}
                   <div className="lg:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Apellido y Nombre</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gimnasta</label>
                     <input 
                       type="text" 
                       required 
@@ -250,7 +331,7 @@ export default function Merchandising() {
                       placeholder="Buscar alumna..."
                     />
                     <datalist id="pedidos-alumnas">
-                       {todasAlumnas.map(a => <option key={a.id} value={`${a.nombre_completo} (DNI: ${a.dni})`} />)}
+                       {todasAlumnas.map(a => <option key={a.id} value={a.nombre_completo} />)}
                     </datalist>
                   </div>
                   <div>
@@ -273,15 +354,15 @@ export default function Merchandising() {
                     <input type="text" required value={formPedido.talle} onChange={e=>setFormPedido({...formPedido, talle: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500 uppercase" placeholder="Ej: S, 12, Único" />
                   </div>
 
-                  {/* Fila 2 */}
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto Cobrado ($) Fijo</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto ($)</label>
                     <input type="text" inputMode="numeric" required value={formPedido.monto} onChange={e=>setFormPedido({...formPedido, monto: e.target.value.replace(/[^0-9.]/g, '')})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500" placeholder="0" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Medio de Pago</label>
                     <select required value={formPedido.metodo} onChange={e=>setFormPedido({...formPedido, metodo: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold uppercase border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500">
                       <option value="efectivo">Efectivo</option>
+                      <option value="debito">Débito</option>
                       <option value="transferencia">Transferencia</option>
                     </select>
                   </div>
@@ -350,9 +431,9 @@ export default function Merchandising() {
                                    }`}
                                    title="Clic para cambiar estado"
                                  >
-                                    {p.estado_entrega || 'no entregado'} {p.estado_entrega === 'entregado' ? '✓' : '⏳'}
+                                    {p.estado_entrega === 'entregado' ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <Clock className="w-3 h-3 mr-1" />}
+                                    {p.estado_entrega || 'no entregado'}
                                  </button>
-                                 <span className="text-[8px] uppercase tracking-widest text-slate-400 font-bold ml-1">Cambiar</span>
                                </div>
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -395,7 +476,7 @@ export default function Merchandising() {
 
       {/* ----------------- TAB CATALOGO ----------------- */}
       {activeTab === 'catalogo' && (
-         <div className="space-y-6">
+         <div className="space-y-6 print:hidden">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <h2 className="text-sm font-black uppercase tracking-tight text-slate-800 flex items-center gap-2">
                  <Package className="w-4 h-4 text-purple-600" /> Artículos Base

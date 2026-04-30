@@ -1,15 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 interface Usuario {
-  uid: string;
+  id: string;
+  uid: string; // Alias for id used in components
   email: string;
   nombre: string;
   telefono: string;
   rol: 'admin' | 'padre';
-  creado_en: any;
+  creado_en?: string;
 }
 
 interface AuthContextType {
@@ -27,38 +28,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubscribeDoc: (() => void) | null = null;
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        unsubscribeDoc = onSnapshot(doc(db, 'usuarios', user.uid), (docSnap) => {
-          if (docSnap.exists()) {
-            setUserData(docSnap.data() as Usuario);
-          } else {
-            setUserData(null);
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Error fetching user data", error);
-          setLoading(false);
-        });
+        await fetchUserData(user.uid);
       } else {
         setUserData(null);
         setLoading(false);
-        if (unsubscribeDoc) unsubscribeDoc();
       }
     });
 
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeDoc) unsubscribeDoc();
-    };
+    return unsubscribe;
   }, []);
+
+  const fetchUserData = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'usuarios', userId));
+      if (userDoc.exists()) {
+        setUserData({ id: userDoc.id, uid: userDoc.id, ...userDoc.data() } as Usuario);
+      } else {
+        console.error("No se encontró el documento del usuario en Firestore");
+        setUserData(null);
+      }
+    } catch (err) {
+      console.error("Error al obtener datos del usuario:", err);
+      setUserData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const logout = async () => {
     await signOut(auth);
-    window.location.href = '/login';
   };
 
   return (
@@ -69,3 +70,4 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

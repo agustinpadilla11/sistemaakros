@@ -12,7 +12,11 @@ import ImportarDocumentos from './components/admin/ImportarDocumentos';
 import FichaAlumna from './components/admin/FichaAlumna';
 import Grupos from './components/admin/Grupos';
 import Cuotas from './components/admin/Cuotas';
-import Merchandising from './components/admin/Merchandising';
+import Indumentaria from './components/admin/Indumentaria';
+import Federacion from './components/admin/Federacion';
+import Matricula from './components/admin/Matricula';
+import Seguro from './components/admin/Seguro';
+import Torneos from './components/admin/Torneos';
 import OtrosCostos from './components/admin/OtrosCostos';
 import CajaDiaria from './components/admin/CajaDiaria';
 import ImportarCaja from './components/admin/ImportarCaja';
@@ -51,7 +55,11 @@ export default function App() {
           <Route path="alumnas/:id" element={<FichaAlumna />} />
           <Route path="grupos" element={<Grupos />} />
           <Route path="cuotas" element={<Cuotas />} />
-          <Route path="merchandising" element={<Merchandising />} />
+          <Route path="indumentaria" element={<Indumentaria />} />
+          <Route path="federacion" element={<Federacion />} />
+          <Route path="matricula" element={<Matricula />} />
+          <Route path="seguro" element={<Seguro />} />
+          <Route path="torneos" element={<Torneos />} />
           <Route path="otros-costos" element={<OtrosCostos />} />
           <Route path="caja" element={<CajaDiaria />} />
           <Route path="caja/importar" element={<ImportarCaja />} />

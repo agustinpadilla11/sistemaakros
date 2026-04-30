@@ -12,7 +12,7 @@ export default function ImportarCSV() {
   useEffect(() => {
     const fetchGrupos = async () => {
       const snap = await getDocs(collection(db, 'grupos'));
-      const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      const data = snap.docs.map(d => ({id: d.id, ...d.data()} as any));
       
       // Orden personalizado
       const priority: Record<string, number> = { 'jardín': 1, 'iniciación': 2, 'formación': 3, 'desarrollo': 4, 'rendimiento': 5 };

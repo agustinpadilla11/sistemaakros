@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Home, Users, CheckSquare, DollarSign, ShoppingBag, Receipt, LogOut, Wallet } from 'lucide-react';
+import { Home, Users, CheckSquare, DollarSign, ShoppingBag, Receipt, LogOut, Wallet, Trophy, ShieldCheck, List } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function AdminLayout() {
@@ -12,8 +12,11 @@ export default function AdminLayout() {
     { to: '/admin/alumnas', icon: Users, label: 'Gimnastas' },
     { to: '/admin/grupos', icon: CheckSquare, label: 'Grupos' },
     { to: '/admin/cuotas', icon: DollarSign, label: 'Cuotas' },
-    { to: '/admin/merchandising', icon: ShoppingBag, label: 'Merchandising' },
-    { to: '/admin/otros-costos', icon: Receipt, label: 'Otros Costos' },
+    { to: '/admin/indumentaria', icon: ShoppingBag, label: 'Indumentaria' },
+    { to: '/admin/federacion', icon: CheckSquare, label: 'Federación' },
+    { to: '/admin/matricula', icon: Receipt, label: 'Matrícula' },
+    { to: '/admin/seguro', icon: ShieldCheck, label: 'Seguro' },
+    { to: '/admin/torneos', icon: Trophy, label: 'Torneos' },
   ];
 
   return (

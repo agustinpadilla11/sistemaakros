@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc, collection, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebase/config';
+import { db } from '../../firebase/config';
+import { supabase } from '../../supabase/config';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 export default function FichaAlumna() {
+  const { userData } = useAuth();
+  if (!userData) return null;
   const { id } = useParams();
   const isNew = !id || id === 'nueva';
   const navigate = useNavigate();
@@ -135,15 +138,24 @@ export default function FichaAlumna() {
       const file = e.target.files[0];
       setUploading(fieldName);
       try {
-        const storageRef = ref(storage, `alumnas/${id}/${Date.now()}_${fieldName}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${id}/${Date.now()}_${fieldName}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('alumnas')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('alumnas')
+          .getPublicUrl(filePath);
         
         await updateDoc(doc(db, 'alumnas', id as string), {
-          [`${fieldName}_url`]: downloadURL
+          [`${fieldName}_url`]: publicUrl
         });
         
-        setFormData(prev => ({ ...prev, [`${fieldName}_url`]: downloadURL }));
+        setFormData(prev => ({ ...prev, [`${fieldName}_url`]: publicUrl }));
         alert('Archivo cargado correctamente');
       } catch (err) {
         console.error(err);

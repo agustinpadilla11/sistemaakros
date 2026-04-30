@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../../firebase/config';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase/config';
 
 export default function Login() {
   const { userData } = useAuth();
@@ -29,46 +28,12 @@ export default function Login() {
       await signInWithEmailAndPassword(auth, email, password);
       // navigation handled by AuthProvider state change
     } catch (err: any) {
-      if (err.code === 'auth/network-request-failed') {
-        setError('Error de red. Si estás usando un bloqueador de anuncios (como uBlock o Brave Shields), intenta desactivarlo para esta página. Firebase necesita conectarse a sus servidores.');
-      } else {
-        setError('Credenciales inválidas o error de red. ' + err.message);
-      }
+      setError('Credenciales inválidas o error de red. ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoLogin = async (rol: 'admin' | 'padre') => {
-    setLoading(true);
-    setError('');
-    const demoEmail = rol === 'admin' ? 'admin@akros.app' : 'padre@akros.app';
-    const demoPass = 'akros123456';
-    
-    try {
-      await signInWithEmailAndPassword(auth, demoEmail, demoPass);
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        try {
-          const cred = await createUserWithEmailAndPassword(auth, demoEmail, demoPass);
-          await setDoc(doc(db, 'usuarios', cred.user.uid), {
-            uid: cred.user.uid,
-            email: demoEmail,
-            nombre: rol === 'admin' ? 'Admnistrador Prueba' : 'Padre Prueba',
-            telefono: '00000000',
-            rol: rol,
-            creado_en: serverTimestamp()
-          });
-        } catch (createErr: any) {
-           setError('Error generando cuenta de prueba: ' + createErr.message);
-           setLoading(false);
-        }
-      } else {
-        setError('Error accediendo a cuenta de prueba: ' + err.message);
-        setLoading(false);
-      }
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">

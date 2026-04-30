@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
 
 export default function Registro() {
@@ -18,18 +18,20 @@ export default function Registro() {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // Create user doc
-      // SEGURIDAD: Solo este correo será Administrador automáticamente. El resto será siempre 'padre'.
+      const user = userCredential.user;
+
+      // Create user doc in 'usuarios' collection
       const isAdmin = email.toLowerCase() === 'mpatojardel@gmail.com';
       
-      await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
-        uid: userCredential.user.uid,
+      await setDoc(doc(db, 'usuarios', user.uid), {
+        id: user.uid,
         email,
         nombre,
-        telefono: '', // Hardcoded empty string to pass Firestore rules
+        telefono: '',
         rol: isAdmin ? 'admin' : 'padre',
-        creado_en: serverTimestamp()
+        creado_en: new Date().toISOString()
       });
+
       navigate(isAdmin ? '/admin' : '/portal');
     } catch (err: any) {
       setError('Error al registrar: ' + err.message);
@@ -37,6 +39,7 @@ export default function Registro() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">

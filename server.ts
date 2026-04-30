@@ -2,12 +2,95 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
 import path from "path";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Initialize Firebase (Server-side)
+  const firebaseConfig = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY,
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.VITE_FIREBASE_APP_ID
+  };
+  const firebaseApp = initializeApp(firebaseConfig);
+  const db = getFirestore(firebaseApp, process.env.VITE_FIREBASE_DATABASE_ID);
+
+  // API Route to send late payment reminders
+  app.post("/api/send-late-payment-reminders", async (req, res) => {
+    try {
+      const resendKey = process.env.RESEND_API_KEY;
+
+      if (!resendKey) {
+        return res.status(500).json({ error: "No se configuró RESEND_API_KEY." });
+      }
+
+      const resend = new Resend(resendKey);
+
+      // Check current date
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const dayOfMonth = now.getDate();
+
+      // Only send if it's after the 15th and May or later
+      if (currentMonth < 5 && currentYear <= 2026) {
+        return res.json({ message: "Sistema exento hasta Mayo 2026." });
+      }
+      
+      if (dayOfMonth <= 15) {
+        return res.json({ message: "Aún no es después del día 15. No se envían avisos de mora." });
+      }
+
+      // Fetch all students (alumnas)
+      const studentsSnap = await getDocs(collection(db, 'alumnas'));
+      const students = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+
+      // Fetch cuotas for the current month
+      const cuotasQuery = query(
+        collection(db, 'cuotas'), 
+        where('anio', '==', currentYear),
+        where('mes', '==', currentMonth),
+        where('estado', '==', 'pagado')
+      );
+      const cuotasSnap = await getDocs(cuotasQuery);
+      const paidStudentIds = new Set(cuotasSnap.docs.map(doc => (doc.data() as any).alumna_id));
+      let sentCount = 0;
+
+      for (const student of students) {
+        // Find email (might be in email_contacto)
+        const email = student.email_contacto || student.email;
+        if (email && !paidStudentIds.has(student.id)) {
+          try {
+            await resend.emails.send({
+              from: 'Akros Gimnasio <avisos@akrosgimnasia.com>',
+              to: email,
+              subject: 'Aviso de Mora en Cuota Mensual',
+              text: `Señor papa,\n\nNo ha pagado la cuota del correspondiente mes en tiempo y forma, por ende se le habrá un incremento en la misma.\n\nAtte.\nGimnasio Akros`,
+            });
+            sentCount++;
+          } catch (e) {
+            console.error("Error sending to:", email, e);
+          }
+        }
+      }
+
+      res.json({ success: true, message: `Se enviaron ${sentCount} avisos de mora.` });
+    } catch (error) {
+      console.error("Critical error in /api/send-late-payment-reminders", error);
+      res.status(500).json({ error: "Error en el proceso de recordatorios." });
+    }
+  });
 
   // API Route to send medical certificate expiration emails via Resend
   app.post("/api/send-reminders", async (req, res) => {

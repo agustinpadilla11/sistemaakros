@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, query, getDocs, updateDoc, doc, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Filter, Upload, Plus } from 'lucide-react';
+import { Filter, Upload, Plus, Download, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -26,11 +26,14 @@ export default function Cuotas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cobrarForm, setCobrarForm] = useState({
     alumna_id: '',
-    monto: '30000',
+    monto: '',
     fecha: new Date().toISOString().split('T')[0],
     metodo: 'transferencia',
     mes_target: (new Date().getMonth() + 1).toString()
   });
+
+  const [searchTermGlobal, setSearchTermGlobal] = useState('');
+  const [selectedHistoryAlumna, setSelectedHistoryAlumna] = useState<any>(null);
 
   const today = new Date();
   const [yearFil, setYearFil] = useState(today.getFullYear());
@@ -61,7 +64,7 @@ export default function Cuotas() {
       const cuotasMap: Record<string, any[]> = {};
       
       cSnap.forEach(d => {
-        const c = { id: d.id, ...d.data() };
+        const c = { id: d.id, ...d.data() } as any;
         if (!cuotasMap[c.alumna_id]) cuotasMap[c.alumna_id] = [];
         cuotasMap[c.alumna_id].push(c);
       });
@@ -79,13 +82,27 @@ export default function Cuotas() {
     e.preventDefault();
     if (!selectedCuota) return;
     try {
-      await updateDoc(doc(db, 'cuotas', selectedCuota.id), {
+      const data = {
         estado: 'pagado',
         monto: Number(monto),
         fecha_pago: fechaPago ? new Date(fechaPago) : serverTimestamp(),
         metodo_pago: metodo,
         notas
-      });
+      };
+
+      if (selectedCuota.isNew) {
+        const newRef = doc(collection(db, 'cuotas'));
+        await setDoc(newRef, {
+          id: newRef.id,
+          alumna_id: selectedCuota.alumna_id,
+          mes: selectedCuota.mes,
+          anio: selectedCuota.anio,
+          ...data
+        });
+      } else {
+        await updateDoc(doc(db, 'cuotas', selectedCuota.id), data);
+      }
+      
       setSelectedCuota(null);
       loadData();
     } catch (err) {
@@ -96,7 +113,7 @@ export default function Cuotas() {
 
   const openModal = (cuota: any) => {
     setSelectedCuota(cuota);
-    setMonto(cuota.monto.toString());
+    setMonto('');
     const d = new Date();
     setFechaPago(d.toISOString().split('T')[0]);
     setMetodo('efectivo');
@@ -107,7 +124,6 @@ export default function Cuotas() {
     e.preventDefault();
     if (!cobrarForm.alumna_id) return;
     try {
-      // Find the existing cuota for that month and year
       const mesNum = Number(cobrarForm.mes_target);
       const existing = cuotas[cobrarForm.alumna_id]?.find(c => c.mes === mesNum && c.anio === yearFil);
       
@@ -119,12 +135,23 @@ export default function Cuotas() {
           metodo_pago: cobrarForm.metodo,
           notas: 'Cobrado desde panel'
         });
-        alert('Pago registrado correctamente.');
-        setIsCobrarOpen(false);
-        loadData();
       } else {
-        alert('No se encontró el registro de cuota para ese mes/alumna.');
+        const newRef = doc(collection(db, 'cuotas'));
+        await setDoc(newRef, {
+          id: newRef.id,
+          alumna_id: cobrarForm.alumna_id,
+          mes: mesNum,
+          anio: yearFil,
+          monto: Number(cobrarForm.monto),
+          estado: 'pagado',
+          fecha_pago: new Date(cobrarForm.fecha),
+          metodo_pago: cobrarForm.metodo,
+          notas: 'Cobrado desde panel (Nuevo registro)'
+        });
       }
+      alert('Pago registrado correctamente.');
+      setIsCobrarOpen(false);
+      loadData();
     } catch (err) {
       console.error(err);
       alert('Error registrando cobro');
@@ -133,6 +160,27 @@ export default function Cuotas() {
 
   const selectedAluGroup = alumnas.find(a => a.id === cobrarForm.alumna_id)?.grupo_id;
   const selectedGroup = grupos.find(g => g.id === selectedAluGroup);
+
+  const handleExportExcel = () => {
+    const exportData = alumnas.map(alu => {
+      const aluCuotas = cuotas[alu.id] || [];
+      const row: any = { Gimnasta: alu.nombre_completo, DNI: alu.dni };
+      MESES.forEach((m, idx) => {
+        const mesIndex = idx + 1;
+        const c = aluCuotas.find(x => x.mes === mesIndex);
+        if (c && c.estado === 'pagado') row[m] = `Pagado ($${c.monto})`;
+        else if (c && c.estado === 'vencido') row[m] = 'Vencido';
+        else if (mesIndex <= 4) row[m] = 'Exento';
+        else row[m] = 'Pendiente';
+      });
+      return row;
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cuotas");
+    XLSX.writeFile(wb, `Estado_Cuotas_${yearFil}.xlsx`);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -205,6 +253,13 @@ export default function Cuotas() {
           >
             <Upload className="w-3 h-3" /> Importar Ene-Abr
           </button>
+
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 bg-green-100 text-green-700 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-green-200 transition-colors"
+          >
+            <Download className="w-3 h-3" /> Exportar Excel
+          </button>
           
           <button 
             onClick={() => setIsCobrarOpen(true)}
@@ -219,14 +274,25 @@ export default function Cuotas() {
               <option value={2024}>2024</option>
               <option value={2025}>2025</option>
               <option value={2026}>2026</option>
+              <option value={2027}>2027</option>
             </select>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-          <h3 className="text-sm font-bold uppercase tracking-tight">Pagos del Año</h3>
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-4">
+          <h3 className="text-sm font-bold uppercase tracking-tight shrink-0">Pagos del Año</h3>
+          <div className="flex-1 max-w-sm relative">
+             <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+             <input 
+               type="text" 
+               placeholder="Buscar gimnasta (A-Z)..." 
+               value={searchTermGlobal}
+               onChange={e => setSearchTermGlobal(e.target.value)}
+               className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+             />
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left bg-white">
@@ -243,18 +309,38 @@ export default function Cuotas() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr><td colSpan={13} className="py-8 text-center text-xs font-bold uppercase text-slate-500">Cargando datos...</td></tr>
-              ) : alumnas.map(alu => {
+              ) : alumnas
+                  .filter(a => a.nombre_completo?.toLowerCase().includes(searchTermGlobal.toLowerCase()))
+                  .sort((a, b) => (a.nombre_completo || '').localeCompare(b.nombre_completo || ''))
+                  .map(alu => {
                 const aluCuotas = cuotas[alu.id] || [];
                 return (
-                  <tr key={alu.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 text-xs font-bold sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-100 z-10 truncate max-w-48">
+                  <tr key={alu.id} className="hover:bg-slate-50 transition-colors group">
+                    <td 
+                      onClick={() => setSelectedHistoryAlumna(alu)}
+                      className="p-4 text-xs font-black cursor-pointer hover:text-purple-600 sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-100 z-10 truncate max-w-48 transition-colors uppercase"
+                    >
                       {alu.nombre_completo}
                     </td>
                     {MESES.map((_, idx) => {
                       const mesIndex = idx + 1;
                       const c = aluCuotas.find(x => x.mes === mesIndex);
+                      const isExento = mesIndex <= 4;
                       
-                      if (!c) return <td key={mesIndex} className="p-3 text-center text-slate-300">-</td>;
+                      if (!c) {
+                        return <td key={mesIndex} className="p-2 text-center">
+                          {isExento ? (
+                            <span className="block w-full h-8 rounded bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-xs" title="Exento">EX</span>
+                          ) : (
+                            <button 
+                              onClick={() => openModal({ alumna_id: alu.id, mes: mesIndex, anio: yearFil, isNew: true })}
+                              className="w-full h-8 rounded flex justify-center items-center font-bold text-xs text-slate-300 hover:bg-slate-100 hover:text-slate-500 transition-colors"
+                            >
+                              -
+                            </button>
+                          )}
+                        </td>;
+                      }
                       
                       const isPagado = c.estado === 'pagado';
                       const isVencido = c.estado === 'vencido';
@@ -262,16 +348,17 @@ export default function Cuotas() {
                       return (
                         <td key={mesIndex} className="p-2 text-center">
                           <button 
-                            onClick={() => { if(!isPagado) openModal(c); }}
-                            title={isPagado ? `Pagado: $${c.monto}` : `Pendiente: $${c.monto}`}
-                            disabled={isPagado}
+                            onClick={() => { if(!isPagado && !isExento) openModal(c); }}
+                            title={isPagado ? `Pagado: $${c.monto}` : isExento ? 'Exento' : `Pendiente: $${c.monto}`}
+                            disabled={isPagado || (!isPagado && isExento)}
                             className={`w-full h-8 rounded flex justify-center items-center font-bold text-xs transition-colors ${
                               isPagado ? 'bg-emerald-100 text-emerald-700 cursor-default' : 
+                              isExento ? 'bg-slate-100 text-slate-400 cursor-default' :
                               isVencido ? 'bg-red-100 text-red-700 hover:bg-red-200' : 
                               'bg-amber-100 text-amber-700 hover:bg-amber-200'
                             }`}
                           >
-                            {isPagado ? '✔' : isVencido ? '!' : '-'}
+                            {isPagado ? '✔' : isExento ? 'EX' : isVencido ? '!' : '-'}
                           </button>
                         </td>
                       );
@@ -307,6 +394,7 @@ export default function Cuotas() {
                   <select value={metodo} onChange={e => setMetodo(e.target.value)} className="w-full border p-2 rounded">
                     <option value="efectivo">Efectivo</option>
                     <option value="transferencia">Transferencia</option>
+                    <option value="debito">Débito</option>
                     <option value="otro">Otro</option>
                   </select>
                 </div>
@@ -379,7 +467,7 @@ export default function Cuotas() {
                   <select required value={cobrarForm.metodo} onChange={e => setCobrarForm({...cobrarForm, metodo: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded outline-none uppercase text-slate-600 focus:ring-purple-500 focus:border-purple-500">
                     <option value="transferencia">Transferencia</option>
                     <option value="efectivo">Efectivo</option>
-                    <option value="mp">Mercado Pago</option>
+                    <option value="debito">Débito</option>
                   </select>
                 </div>
               </div>
@@ -389,6 +477,67 @@ export default function Cuotas() {
                 <button type="submit" disabled={!cobrarForm.alumna_id} className="px-4 py-2 bg-purple-600 text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 disabled:opacity-50">Completar Cobro</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Historial Modal */}
+      {selectedHistoryAlumna && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                   <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Historial de Pagos - {selectedHistoryAlumna.nombre_completo}</h2>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Año {yearFil}</p>
+                </div>
+                <button onClick={() => setSelectedHistoryAlumna(null)} className="text-slate-300 hover:text-slate-600 transition-colors">
+                   <XCircle className="w-8 h-8"/>
+                </button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-6 bg-white">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="text-[10px] uppercase text-slate-400 tracking-widest font-black border-b border-slate-100">
+                         <th className="pb-4">Mes</th>
+                         <th className="pb-4">Estado</th>
+                         <th className="pb-4">Fecha Pago</th>
+                         <th className="pb-4">Monto</th>
+                         <th className="pb-4">Método</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {MESES.map((m, idx) => {
+                         const mesIndex = idx + 1;
+                         const c = (cuotas[selectedHistoryAlumna.id] || []).find(x => x.mes === mesIndex);
+                         return (
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                               <td className="py-4 text-xs font-bold uppercase text-slate-500">{m}</td>
+                               <td className="py-4">
+                                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
+                                    c?.estado === 'pagado' ? 'bg-emerald-100 text-emerald-700' : 
+                                    mesIndex <= 4 ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                     {c?.estado === 'pagado' ? 'Pagado' : mesIndex <= 4 ? 'Exento' : 'Pendiente'}
+                                  </span>
+                               </td>
+                               <td className="py-4 text-xs text-slate-500 font-medium">
+                                  {c?.fecha_pago ? (c.fecha_pago?.toDate ? c.fecha_pago.toDate().toLocaleDateString() : new Date(c.fecha_pago).toLocaleDateString()) : '-'}
+                               </td>
+                               <td className="py-4 text-xs font-bold text-slate-700">
+                                  {c?.monto ? `$${c.monto}` : '-'}
+                               </td>
+                               <td className="py-4 text-[10px] font-black uppercase text-purple-600">
+                                  {c?.metodo_pago || '-'}
+                               </td>
+                            </tr>
+                         );
+                      })}
+                   </tbody>
+                </table>
+             </div>
+             <div className="p-4 bg-slate-50 border-t border-slate-100 text-right">
+                <button onClick={() => setSelectedHistoryAlumna(null)} className="px-6 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-colors shadow-lg">Cerrar Historial</button>
+             </div>
           </div>
         </div>
       )}
