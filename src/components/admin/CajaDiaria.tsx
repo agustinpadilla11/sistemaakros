@@ -1,26 +1,22 @@
+import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useCajaDiaria } from '../../hooks/useCajaDiaria';
-import { ChevronLeft, ChevronRight, Calculator, Plus, Trash2, Calendar, ShoppingCart, UserCheck, Tag, Download, CheckCircle2 } from 'lucide-react';
-
+import { ChevronLeft, ChevronRight, Calculator, Plus, Trash2, Calendar, ShoppingCart, UserCheck, Download, CheckCircle2 } from 'lucide-react';
 
 export default function CajaDiaria() {
   const { userData } = useAuth();
   const caja = useCajaDiaria();
 
-  // Guard AFTER all hooks (fixes React hooks violation)
   if (!userData) return null;
 
-  // Destructure for template compatibility
   const {
-    currentDate, currentMonthDate, changeDay, changeMonth, dateStr,
+    currentDate, currentMonthDate, changeDay, changeMonth,
     loading, formatter, exportToExcel, MESES,
-    cuotas, otrosCostos, ventasMerch, egresos, comienzoCaja,
-    licencias, inscripcionesFed, matriculas, seguros, torneosPagos,
-    alumnas, productos,
+    comienzoCaja, alumnas, productos,
     posTab, setPosTab,
-    cuotaForm, setCuotaForm, merchForm, setMerchForm, otroForm, setOtroForm,
-    isProcessing, searchCuota, setSearchCuota, searchMerch, setSearchMerch, searchOtro, setSearchOtro,
-    handlePOSCuota, handlePOSMerch, handlePOSOtro,
+    cuotaForm, setCuotaForm, merchForm, setMerchForm,
+    isProcessing, searchCuota, setSearchCuota, searchMerch, setSearchMerch,
+    handlePOSCuota, handlePOSMerch,
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
     showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, arqueoData, handleArqueo,
@@ -32,10 +28,6 @@ export default function CajaDiaria() {
     cajaFinalEfvo, totalFinalTodo,
     totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes,
   } = caja;
-
-
-
-
 
   return (
     <div className="space-y-6">
@@ -63,14 +55,12 @@ export default function CajaDiaria() {
             <Plus className="w-3 h-3" /> Salida de Caja (Gasto)
           </button>
         </div>
-
       </div>
 
       {loading ? (
         <div className="py-12 text-center text-xs font-bold uppercase text-slate-400">Cargando flujos de caja...</div>
       ) : (
         <>
-          {/* RECEPCION / POS TERMINAL */}
           <div className="bg-white rounded-xl shadow-md border-2 border-purple-200 overflow-hidden mb-6">
             <div className="bg-purple-900 px-4 py-3 flex items-center justify-between">
                <h2 className="text-white text-sm font-black uppercase tracking-widest flex items-center gap-2">
@@ -79,107 +69,213 @@ export default function CajaDiaria() {
                <div className="flex gap-1 bg-purple-950 p-1 rounded-lg">
                  <button onClick={()=>setPosTab('cuota')} className={`px-4 py-1.5 rounded text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all ${posTab === 'cuota' ? 'bg-purple-500 text-white' : 'text-purple-300 hover:text-white'}`}><UserCheck className="w-3 h-3"/> Cuota</button>
                  <button onClick={()=>setPosTab('merch')} className={`px-4 py-1.5 rounded text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all ${posTab === 'merch' ? 'bg-purple-500 text-white' : 'text-purple-300 hover:text-white'}`}><ShoppingCart className="w-3 h-3"/> Kiosko</button>
+                 <button onClick={()=>setPosTab('otro')} className={`px-4 py-1.5 rounded text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 transition-all ${posTab === 'otro' ? 'bg-purple-500 text-white' : 'text-purple-300 hover:text-white'}`}><Plus className="w-3 h-3"/> Varios</button>
                </div>
             </div>
             <div className="p-4 bg-purple-50/50">
-               <datalist id="pos-alumnas-datalist">
-                 {alumnas.map(a => <option key={a.id} value={a.nombre_completo} />)}
-               </datalist>
-               <datalist id="pos-merch-datalist">
-                 {productos.map(p => <option key={p.id} value={p.nombre}>{`$${p.precio} (Stk: ${p.stock})`}</option>)}
-               </datalist>
-
                {posTab === 'cuota' && (
-                 <form onSubmit={handlePOSCuota} className="grid grid-cols-6 gap-3 items-end">
-                   <div className="col-span-2 relative">
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Gimnasta</label>
-                     <input 
-                       type="text" list="pos-alumnas-datalist" required 
-                       value={searchCuota}
-                       onChange={e => {
-                         const val = e.target.value;
-                         setSearchCuota(val);
-                         const matched = alumnas.find(a => 
-                           a.nombre_completo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === 
-                           val.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
-                         );
-                         setCuotaForm({...cuotaForm, alumna_id: matched ? matched.id : ''});
-                       }}
-                       placeholder="Ej: Pérez María..."
-                       className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mes</label>
-                     <select required value={cuotaForm.mes} onChange={e=>setCuotaForm({...cuotaForm, mes: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
-                        {MESES.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
-                     </select>
-                   </div>
-                   <div>
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Monto ($)</label>
-                     <input type="number" required value={cuotaForm.monto} onChange={e=>setCuotaForm({...cuotaForm, monto: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" placeholder="Ej: 30000" />
-                   </div>
-                   <div>
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
-                     <select required value={cuotaForm.metodo_pago} onChange={e=>setCuotaForm({...cuotaForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
-                        <option value="efectivo">EFVO</option>
-                        <option value="debito">Débito</option>
-                        <option value="transferencia">Transferencia</option>
-                        <option value="mp">Mercado Pago</option>
-
-                     </select>
-                   </div>
-                   <div>
-                     <button type="submit" disabled={isProcessing || !cuotaForm.alumna_id} className="w-full bg-purple-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-purple-700 transition-colors disabled:opacity-50">
-                        Cobrar Cuota
-                     </button>
-                   </div>
+                 <form 
+                   onSubmit={(e) => {
+                     e.preventDefault();
+                     handlePOSCuota(e);
+                   }} 
+                   className="grid grid-cols-6 gap-3 items-end"
+                 >
+                    <div className="col-span-2 relative">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Gimnasta</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={searchCuota}
+                        autoComplete="off"
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSearchCuota(val);
+                          const matched = alumnas.find(a => 
+                            a.nombre_completo.trim().toLowerCase() === val.trim().toLowerCase()
+                          );
+                          setCuotaForm({...cuotaForm, alumna_id: matched ? matched.id : ''});
+                        }}
+                        placeholder="Ej: Pérez María..."
+                        className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
+                      />
+                      {searchCuota.length >= 2 && !cuotaForm.alumna_id && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-purple-100 rounded shadow-2xl max-h-48 overflow-y-auto">
+                          {alumnas
+                            .filter(a => a.nombre_completo.toLowerCase().includes(searchCuota.toLowerCase()))
+                            .map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => {
+                                  setSearchCuota(a.nombre_completo);
+                                  setCuotaForm({...cuotaForm, alumna_id: a.id});
+                                }}
+                                className="w-full text-left px-3 py-2.5 text-xs font-bold uppercase hover:bg-purple-50 text-slate-700 border-b border-slate-50 last:border-0"
+                              >
+                                {a.nombre_completo}
+                              </button>
+                            ))
+                          }
+                          {alumnas.filter(a => a.nombre_completo.toLowerCase().includes(searchCuota.toLowerCase())).length === 0 && (
+                            <div className="p-3 text-[10px] uppercase font-bold text-slate-400">No se encontraron resultados</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mes</label>
+                      <select required value={cuotaForm.mes} onChange={e=>setCuotaForm({...cuotaForm, mes: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
+                         {MESES.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Monto ($)</label>
+                      <input type="number" required value={cuotaForm.monto} onChange={e=>setCuotaForm({...cuotaForm, monto: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" placeholder="Ej: 30000" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
+                      <select required value={cuotaForm.metodo_pago} onChange={e=>setCuotaForm({...cuotaForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
+                         <option value="efectivo">EFVO</option>
+                         <option value="debito">Débito</option>
+                         <option value="transferencia">Transferencia</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button 
+                        type="submit" 
+                        disabled={isProcessing || !cuotaForm.alumna_id} 
+                        className="w-full bg-purple-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-purple-700 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                      >
+                         {isProcessing ? 'Procesando...' : 'Cobrar Cuota'}
+                      </button>
+                    </div>
                  </form>
                )}
                {posTab === 'merch' && (
-                 <form onSubmit={handlePOSMerch} className="grid grid-cols-5 gap-3 items-end">
-                   <div className="col-span-2 relative">
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Producto</label>
-                     <input 
-                       type="text" list="pos-merch-datalist" required 
-                       value={searchMerch}
-                       onChange={e => {
-                         const val = e.target.value;
-                         setSearchMerch(val);
-                         const matched = productos.find(p => 
-                           p.nombre.toLowerCase() === val.toLowerCase()
-                         );
-                         setMerchForm({...merchForm, producto_id: matched ? matched.id : ''});
-                       }}
-                       placeholder="Ej: Turrón..."
-                       className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unidades</label>
-                     <input type="number" required min="1" value={merchForm.cantidad} onChange={e=>setMerchForm({...merchForm, cantidad: Number(e.target.value)})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" />
-                   </div>
-                   <div>
-                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
-                     <select required value={merchForm.metodo_pago} onChange={e=>setMerchForm({...merchForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
-                        <option value="efectivo">EFVO</option>
-                        <option value="debito">Débito</option>
-                        <option value="transferencia">Transferencia</option>
-                        <option value="mp">Mercado Pago</option>
-
-                     </select>
-                   </div>
-                   <div>
-                     <button type="submit" disabled={isProcessing || !merchForm.producto_id} className="w-full bg-emerald-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                        Vender
-                     </button>
-                   </div>
+                 <form 
+                   onSubmit={(e) => {
+                     e.preventDefault();
+                     handlePOSMerch(e);
+                   }} 
+                   className="grid grid-cols-5 gap-3 items-end"
+                 >
+                    <div className="col-span-2 relative">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Producto</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={searchMerch}
+                        autoComplete="off"
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSearchMerch(val);
+                          const matched = productos.find(p => 
+                            p.nombre.trim().toLowerCase() === val.trim().toLowerCase()
+                          );
+                          setMerchForm({...merchForm, producto_id: matched ? matched.id : ''});
+                        }}
+                        placeholder="Ej: Turrón..."
+                        className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
+                      />
+                      {searchMerch.length >= 2 && !merchForm.producto_id && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-purple-100 rounded shadow-2xl max-h-48 overflow-y-auto">
+                          {productos
+                            .filter(p => p.nombre.toLowerCase().includes(searchMerch.toLowerCase()))
+                            .map(p => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setSearchMerch(p.nombre);
+                                  setMerchForm({...merchForm, producto_id: p.id});
+                                }}
+                                className="w-full text-left px-3 py-2.5 text-xs font-bold uppercase hover:bg-emerald-50 text-slate-700 border-b border-slate-50 last:border-0"
+                              >
+                                {p.nombre} - ${p.precio} (Stk: {p.stock})
+                              </button>
+                            ))
+                          }
+                          {productos.filter(p => p.nombre.toLowerCase().includes(searchMerch.toLowerCase())).length === 0 && (
+                            <div className="p-3 text-[10px] uppercase font-bold text-slate-400">No hay productos</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unidades</label>
+                      <input type="number" required min="1" value={merchForm.cantidad} onChange={e=>setMerchForm({...merchForm, cantidad: Number(e.target.value)})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
+                      <select required value={merchForm.metodo_pago} onChange={e=>setMerchForm({...merchForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
+                         <option value="efectivo">EFVO</option>
+                         <option value="debito">Débito</option>
+                         <option value="transferencia">Transferencia</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button 
+                        type="submit" 
+                        disabled={isProcessing || !merchForm.producto_id} 
+                        className="w-full bg-emerald-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                      >
+                         {isProcessing ? 'Procesando...' : 'Vender'}
+                      </button>
+                    </div>
+                 </form>
+               )}
+               {posTab === 'otro' && (
+                 <form 
+                   onSubmit={(e) => {
+                     e.preventDefault();
+                     handlePOSOtro(e);
+                   }} 
+                   className="grid grid-cols-5 gap-3 items-end"
+                 >
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Concepto / Varios</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={otroForm.concepto} 
+                        onChange={e=>setOtroForm({...otroForm, concepto: e.target.value})} 
+                        className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
+                        placeholder="Ej: Inscripción, Gaseosa, etc..." 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Monto ($)</label>
+                      <input 
+                        type="number" 
+                        required 
+                        value={otroForm.monto} 
+                        onChange={e=>setOtroForm({...otroForm, monto: e.target.value})} 
+                        className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
+                      <select required value={otroForm.metodo_pago} onChange={e=>setOtroForm({...otroForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
+                         <option value="efectivo">EFVO</option>
+                         <option value="debito">Débito</option>
+                         <option value="transferencia">Transferencia</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button 
+                        type="submit" 
+                        disabled={isProcessing} 
+                        className="w-full bg-slate-800 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                      >
+                         {isProcessing ? 'Procesando...' : 'Cargar'}
+                      </button>
+                    </div>
                  </form>
                )}
             </div>
           </div>
 
-          {/* TABLERO DIARIO */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Comienzo Caja</span>
@@ -234,9 +330,7 @@ export default function CajaDiaria() {
             </div>
           </div>
 
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Detalle Ingresos */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                <div className="p-4 border-b border-slate-100 bg-slate-50">
                  <h3 className="text-xs font-bold uppercase tracking-tight text-emerald-700">Detalle Ingresos de Hoy</h3>
@@ -312,7 +406,6 @@ export default function CajaDiaria() {
                </div>
             </div>
 
-            {/* Detalle Egresos */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50">
                   <h3 className="text-xs font-bold uppercase tracking-tight text-red-700">Detalle Salidas de Caja de Hoy</h3>
@@ -345,13 +438,13 @@ export default function CajaDiaria() {
                    <Calendar className="w-4 h-4 text-purple-600" /> Totales Acumulados (Mes)
                  </h2>
                  <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl shadow-sm border border-slate-200">
-                    <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-200 rounded transition-colors text-slate-600" title="Mes anterior">
+                    <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-200 rounded transition-colors text-slate-600">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wide min-w-[120px] text-center">
                       {MESES[currentMonthDate.getMonth()]} {currentMonthDate.getFullYear()}
                     </span>
-                    <button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-200 rounded transition-colors text-slate-600" title="Mes siguiente">
+                    <button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-200 rounded transition-colors text-slate-600">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                  </div>
@@ -378,19 +471,18 @@ export default function CajaDiaria() {
                    <p className="text-sm font-black text-red-600">{formatter.format(totEgresosMes)}</p>
                 </div>
                 <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg border border-slate-800">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-1">TOTAL FINAL</p>
-                  <p className="text-xl font-black">{formatter.format(totFinalMes)}</p>
+                   <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-1">TOTAL FINAL</p>
+                   <p className="text-xl font-black">{formatter.format(totFinalMes)}</p>
                 </div>
              </div>
           </div>
         </>
       )}
 
-      {/* MODAL EGRESO */}
       {showEgreso && (
         <div className="fixed inset-0 bg-slate-900/50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 border border-slate-200">
-             <h2 className="text-sm font-bold uppercase mb-4">Salida de Caja / Gasto (Hoy)</h2>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+             <h2 className="text-sm font-bold uppercase mb-4">Salida de Caja / Gasto</h2>
              <form onSubmit={handleSaveEgreso} className="space-y-4">
                <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Concepto</label>
@@ -406,43 +498,39 @@ export default function CajaDiaria() {
                      <option value="efectivo">Efectivo</option>
                      <option value="debito">Débito</option>
                      <option value="transferencia">Transferencia</option>
-                     <option value="mp">Mercado Pago</option>
                   </select>
                </div>
-               <div className="flex gap-2 justify-end mt-2 pt-2">
-                  <button type="button" onClick={()=>setShowEgreso(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
-                  <button type="submit" className="px-4 py-2 bg-red-500 rounded text-[10px] uppercase font-bold text-white hover:bg-red-600">Guardar</button>
+               <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={()=>setShowEgreso(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600">Cancelar</button>
+                  <button type="submit" className="px-4 py-2 bg-red-500 rounded text-[10px] uppercase font-bold text-white">Guardar</button>
                </div>
              </form>
           </div>
         </div>
       )}
 
-      {/* MODAL COMIENZO CAJA */}
       {cajaFormOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 border border-slate-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
              <h2 className="text-sm font-bold uppercase mb-4">Comienzo de Caja</h2>
-             <p className="text-[10px] text-slate-500 font-bold uppercase mb-4">Registra el efectivo inicial para este día.</p>
              <form onSubmit={handleUpdateCaja} className="space-y-4">
                <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Monto ($)</label>
                   <input type="number" required value={nuevoComienzo} onChange={e=>setNuevoComienzo(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" />
                </div>
-               <div className="flex gap-2 justify-end mt-2">
-                  <button type="button" onClick={()=>setCajaFormOpen(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
-                  <button type="submit" className="px-4 py-2 bg-purple-600 rounded text-[10px] uppercase font-bold text-white hover:bg-purple-700">Guardar</button>
+               <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={()=>setCajaFormOpen(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600">Cancelar</button>
+                  <button type="submit" className="px-4 py-2 bg-purple-600 rounded text-[10px] uppercase font-bold text-white">Guardar</button>
                </div>
              </form>
           </div>
         </div>
       )}
-      {/* MODAL ARQUEO */}
+
       {showArqueo && (
         <div className="fixed inset-0 bg-slate-900/50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 border border-slate-200">
-             <h2 className="text-sm font-bold uppercase mb-2">Arqueo de Caja</h2>
-             <p className="text-[10px] text-slate-500 font-bold uppercase mb-4">Ingresá el efectivo físico total que hay en caja ahora.</p>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+             <h2 className="text-sm font-bold uppercase mb-4">Arqueo de Caja</h2>
              <div className="bg-slate-50 p-3 rounded mb-4 flex justify-between items-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Esperado:</span>
                 <span className="text-xs font-black text-slate-700">{formatter.format(cajaFinalEfvo)}</span>
@@ -450,11 +538,11 @@ export default function CajaDiaria() {
              <form onSubmit={handleArqueo} className="space-y-4">
                <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Efectivo Real ($)</label>
-                  <input type="number" required value={efectivoReal} onChange={e=>setEfectivoReal(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" placeholder="Ej: 45500" />
+                  <input type="number" required value={efectivoReal} onChange={e=>setEfectivoReal(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" />
                </div>
-               <div className="flex gap-2 justify-end mt-2">
-                  <button type="button" onClick={()=>setShowArqueo(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
-                  <button type="submit" className="px-4 py-2 bg-purple-600 rounded text-[10px] uppercase font-bold text-white hover:bg-purple-700">Guardar Cierre</button>
+               <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={()=>setShowArqueo(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600">Cancelar</button>
+                  <button type="submit" className="px-4 py-2 bg-purple-600 rounded text-[10px] uppercase font-bold text-white">Guardar Cierre</button>
                </div>
              </form>
           </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, getDocs, updateDoc, doc, where, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, updateDoc, doc, where, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Filter, Upload, Plus, Download, XCircle } from 'lucide-react';
+import { Filter, Upload, Plus, Download, XCircle, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -78,6 +78,18 @@ export default function Cuotas() {
 
   useEffect(() => { loadData(); }, [yearFil]);
 
+  const handleDeleteCuota = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este registro de pago?')) return;
+    try {
+      await deleteDoc(doc(db, 'cuotas', id));
+      alert('Registro eliminado correctamente');
+      loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar registro');
+    }
+  };
+
   const handlePagar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCuota) return;
@@ -87,7 +99,8 @@ export default function Cuotas() {
         monto: Number(monto),
         fecha_pago: fechaPago ? new Date(fechaPago) : serverTimestamp(),
         metodo_pago: metodo,
-        notas
+        notas,
+        actualizado_el: serverTimestamp()
       };
 
       if (selectedCuota.isNew) {
@@ -97,6 +110,7 @@ export default function Cuotas() {
           alumna_id: selectedCuota.alumna_id,
           mes: selectedCuota.mes,
           anio: selectedCuota.anio,
+          creado_el: serverTimestamp(),
           ...data
         });
       } else {
@@ -113,10 +127,10 @@ export default function Cuotas() {
 
   const openModal = (cuota: any) => {
     setSelectedCuota(cuota);
-    setMonto('');
+    setMonto(cuota.monto || '');
     const d = new Date();
     setFechaPago(d.toISOString().split('T')[0]);
-    setMetodo('efectivo');
+    setMetodo(cuota.metodo_pago || 'efectivo');
     setNotas(cuota.notas || '');
   };
 
@@ -125,7 +139,7 @@ export default function Cuotas() {
     if (!cobrarForm.alumna_id) return;
     try {
       const mesNum = Number(cobrarForm.mes_target);
-      const existing = cuotas[cobrarForm.alumna_id]?.find(c => c.mes === mesNum && c.anio === yearFil);
+      const existing = (cuotas[cobrarForm.alumna_id] || []).find(c => c.mes === mesNum && c.anio === yearFil);
       
       if (existing) {
         await updateDoc(doc(db, 'cuotas', existing.id), {
@@ -133,7 +147,8 @@ export default function Cuotas() {
           monto: Number(cobrarForm.monto),
           fecha_pago: new Date(cobrarForm.fecha),
           metodo_pago: cobrarForm.metodo,
-          notas: 'Cobrado desde panel'
+          notas: 'Cobrado desde panel',
+          actualizado_el: serverTimestamp()
         });
       } else {
         const newRef = doc(collection(db, 'cuotas'));
@@ -146,20 +161,27 @@ export default function Cuotas() {
           estado: 'pagado',
           fecha_pago: new Date(cobrarForm.fecha),
           metodo_pago: cobrarForm.metodo,
-          notas: 'Cobrado desde panel (Nuevo registro)'
+          notas: 'Cobrado desde panel (Nuevo registro)',
+          creado_el: serverTimestamp(),
+          actualizado_el: serverTimestamp()
         });
       }
       alert('Pago registrado correctamente.');
       setIsCobrarOpen(false);
+      setSearchTerm('');
+      setCobrarForm({
+        alumna_id: '',
+        monto: '',
+        fecha: new Date().toISOString().split('T')[0],
+        metodo: 'transferencia',
+        mes_target: (new Date().getMonth() + 1).toString()
+      });
       loadData();
     } catch (err) {
       console.error(err);
       alert('Error registrando cobro');
     }
   };
-
-  const selectedAluGroup = alumnas.find(a => a.id === cobrarForm.alumna_id)?.grupo_id;
-  const selectedGroup = grupos.find(g => g.id === selectedAluGroup);
 
   const handleExportExcel = () => {
     const exportData = alumnas.map(alu => {
@@ -214,14 +236,28 @@ export default function Cuotas() {
             if (rowKey) {
               const val = row[rowKey]?.toString().toLowerCase().trim();
               if (val === 'pagado' || val === 'si' || val === 'ok' || val === 'true' || Number(val) > 0) {
-                const existing = cuotas[alu.id]?.find(c => c.mes === mKey.mes && c.anio === yearFil);
-                if (existing && existing.estado !== 'pagado') {
-                  batchPromises.push(updateDoc(doc(db, 'cuotas', existing.id), {
+                const existing = (cuotas[alu.id] || []).find(c => c.mes === mKey.mes && c.anio === yearFil);
+                if (!existing || existing.estado !== 'pagado') {
+                  const data = {
                     estado: 'pagado',
                     fecha_pago: new Date(),
                     metodo_pago: 'importacion',
-                    notas: 'Importado de Excel/CSV'
-                  }));
+                    notas: 'Importado de Excel/CSV',
+                    actualizado_el: serverTimestamp()
+                  };
+                  if (existing) {
+                    batchPromises.push(updateDoc(doc(db, 'cuotas', existing.id), data));
+                  } else {
+                    const newRef = doc(collection(db, 'cuotas'));
+                    batchPromises.push(setDoc(newRef, {
+                      id: newRef.id,
+                      alumna_id: alu.id,
+                      mes: mKey.mes,
+                      anio: yearFil,
+                      creado_el: serverTimestamp(),
+                      ...data
+                    }));
+                  }
                 }
               }
             }
@@ -230,11 +266,11 @@ export default function Cuotas() {
       }
       
       await Promise.all(batchPromises);
-      alert(`Importación exitosa. Se actualizaron ${batchPromises.length} cuotas.`);
+      alert(`Importación exitosa. Se procesaron ${batchPromises.length} cuotas.`);
       loadData();
     } catch (err) {
       console.error(err);
-      alert('Error en la importación. Asegúrese de que el formato sea correcto.');
+      alert('Error en la importación.');
     } finally {
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -297,10 +333,10 @@ export default function Cuotas() {
         <div className="overflow-x-auto">
           <table className="w-full text-left bg-white">
             <thead>
-              <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-white">
-                <th className="p-4 font-black sticky left-0 bg-white border-r border-b border-slate-100 z-10 w-48">Gimnasta</th>
+              <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-white border-b border-slate-100">
+                <th className="p-4 font-black sticky left-0 bg-white border-r border-slate-100 z-10 w-48">Gimnasta</th>
                 {MESES.map((m, i) => (
-                  <th key={m} className={`p-3 font-black text-center w-16 border-b border-slate-100 ${(today.getMonth() === i && yearFil === today.getFullYear()) ? 'bg-purple-50 text-purple-600' : ''}`}>
+                  <th key={m} className={`p-3 font-black text-center w-16 ${(today.getMonth() === i && yearFil === today.getFullYear()) ? 'bg-purple-50 text-purple-600' : ''}`}>
                     {m}
                   </th>
                 ))}
@@ -372,7 +408,7 @@ export default function Cuotas() {
       </div>
 
       {selectedCuota && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <h2 className="text-xl font-bold mb-4">Registrar Pago</h2>
             <p className="text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded">
@@ -423,8 +459,8 @@ export default function Cuotas() {
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Buscar Gimnasta (Apellido/Nombre)</label>
                 <input 
                   type="text"
-                  list="alumnas-datalist"
                   required 
+                  autoComplete="off"
                   value={searchTerm}
                   onChange={e => {
                     setSearchTerm(e.target.value);
@@ -434,13 +470,25 @@ export default function Cuotas() {
                   placeholder="Ej: Pérez María..."
                   className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded outline-none uppercase text-slate-600 focus:ring-purple-500 focus:border-purple-500"
                 />
-                <datalist id="alumnas-datalist">
-                  {alumnas.map(a => (
-                    <option key={a.id} value={a.nombre_completo} />
-                  ))}
-                </datalist>
-                {!cobrarForm.alumna_id && searchTerm.length > 0 && (
-                   <p className="text-[9px] text-red-500 font-bold uppercase tracking-wide mt-1">Selecciona una gimnasta válida de la lista.</p>
+                {searchTerm.length > 2 && !cobrarForm.alumna_id && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded shadow-2xl max-h-48 overflow-y-auto">
+                    {alumnas
+                      .filter(a => a.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map(a => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => {
+                            setSearchTerm(a.nombre_completo);
+                            setCobrarForm({...cobrarForm, alumna_id: a.id});
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-xs font-bold uppercase hover:bg-slate-50 text-slate-700 border-b border-slate-100 last:border-0"
+                        >
+                          {a.nombre_completo}
+                        </button>
+                      ))
+                    }
+                  </div>
                 )}
               </div>
 
@@ -480,6 +528,7 @@ export default function Cuotas() {
           </div>
         </div>
       )}
+
       {/* Historial Modal */}
       {selectedHistoryAlumna && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
@@ -500,9 +549,10 @@ export default function Cuotas() {
                       <tr className="text-[10px] uppercase text-slate-400 tracking-widest font-black border-b border-slate-100">
                          <th className="pb-4">Mes</th>
                          <th className="pb-4">Estado</th>
-                         <th className="pb-4">Fecha Pago</th>
-                         <th className="pb-4">Monto</th>
-                         <th className="pb-4">Método</th>
+                         <th className="pb-4 text-center">Fecha Pago</th>
+                         <th className="pb-4 text-center">Monto</th>
+                         <th className="pb-4 text-center">Método</th>
+                         <th className="pb-4 text-right">Acciones</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
@@ -510,7 +560,7 @@ export default function Cuotas() {
                          const mesIndex = idx + 1;
                          const c = (cuotas[selectedHistoryAlumna.id] || []).find(x => x.mes === mesIndex);
                          return (
-                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors group">
                                <td className="py-4 text-xs font-bold uppercase text-slate-500">{m}</td>
                                <td className="py-4">
                                   <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
@@ -520,14 +570,25 @@ export default function Cuotas() {
                                      {c?.estado === 'pagado' ? 'Pagado' : mesIndex <= 4 ? 'Exento' : 'Pendiente'}
                                   </span>
                                </td>
-                               <td className="py-4 text-xs text-slate-500 font-medium">
+                               <td className="py-4 text-xs text-slate-500 font-medium text-center">
                                   {c?.fecha_pago ? (c.fecha_pago?.toDate ? c.fecha_pago.toDate().toLocaleDateString() : new Date(c.fecha_pago).toLocaleDateString()) : '-'}
                                </td>
-                               <td className="py-4 text-xs font-bold text-slate-700">
+                               <td className="py-4 text-xs font-bold text-slate-700 text-center">
                                   {c?.monto ? `$${c.monto}` : '-'}
                                </td>
-                               <td className="py-4 text-[10px] font-black uppercase text-purple-600">
+                               <td className="py-4 text-[10px] font-black uppercase text-purple-600 text-center">
                                   {c?.metodo_pago || '-'}
+                               </td>
+                               <td className="py-4 text-right">
+                                  {c && (
+                                     <button 
+                                        onClick={() => handleDeleteCuota(c.id)}
+                                        className="text-red-400 hover:text-red-600 transition-colors p-1"
+                                        title="Eliminar registro"
+                                     >
+                                        <Trash2 className="w-4 h-4"/>
+                                     </button>
+                                  )}
                                </td>
                             </tr>
                          );

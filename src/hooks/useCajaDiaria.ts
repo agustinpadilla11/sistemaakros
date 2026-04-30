@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import * as XLSX from 'xlsx';
 import type { Alumna, Producto, ArqueoData } from '../types';
@@ -14,7 +14,7 @@ const isEfectivo = (item: Record<string, any>) => getMetodo(item) === 'efectivo'
 const isDebito = (item: Record<string, any>) => getMetodo(item) === 'debito';
 const isTransf = (item: Record<string, any>) => {
   const m = getMetodo(item);
-  return m === 'transferencia' || m === 'mp' || m === 'mercado pago';
+  return m === 'transferencia';
 };
 
 const sumMonto = (items: Record<string, any>[]) => items.reduce((a, b) => a + (b.monto || 0), 0);
@@ -85,19 +85,31 @@ export function useCajaDiaria() {
 
       const cuotasSnap = await getDocs(query(collection(db, 'cuotas'), where('estado', '==', 'pagado')));
       setCuotas(cuotasSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
-        .filter((c: any) => c.fecha_pago && c.fecha_pago.toDate() >= startOfMonth && c.fecha_pago.toDate() <= endOfMonth));
+        .filter((c: any) => {
+          const d = toDate(c.fecha_pago);
+          return d >= startOfMonth && d <= endOfMonth;
+        }));
 
       const otrosSnap = await getDocs(query(collection(db, 'otros_costos'), where('estado', '==', 'pagado')));
       setOtrosCostos(otrosSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
-        .filter((c: any) => c.fecha && c.fecha.toDate() >= startOfMonth && c.fecha.toDate() <= endOfMonth));
+        .filter((c: any) => {
+          const d = toDate(c.fecha);
+          return d >= startOfMonth && d <= endOfMonth;
+        }));
 
       const ventasSnap = await getDocs(collection(db, 'ventas_merch'));
       setVentasMerch(ventasSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
-        .filter((v: any) => v.fecha && v.fecha.toDate() >= startOfMonth && v.fecha.toDate() <= endOfMonth));
+        .filter((v: any) => {
+          const d = toDate(v.fecha);
+          return d >= startOfMonth && d <= endOfMonth;
+        }));
 
       const egresosSnap = await getDocs(collection(db, 'egresos'));
       setEgresos(egresosSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
-        .filter((e: any) => e.fecha && e.fecha.toDate() >= startOfMonth && e.fecha.toDate() <= endOfMonth));
+        .filter((e: any) => {
+          const d = toDate(e.fecha);
+          return d >= startOfMonth && d <= endOfMonth;
+        }));
 
       const arqueoSnap = await getDocs(collection(db, 'arqueos'));
       const dayArqueo = arqueoSnap.docs.find(d => d.id === dateStr);
@@ -152,105 +164,248 @@ export function useCajaDiaria() {
 
   // ---------- POS ACTIONS ----------
   const handlePOSCuota = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    
+    const { alumna_id, monto, mes, metodo_pago } = cuotaForm;
+    
+    if (!alumna_id) {
+      alert('Por favor, selecciona una gimnasta de la lista desplegable.');
+      return;
+    }
+    if (!monto || Number(monto) <= 0) {
+      alert('Por favor, ingresa un monto válido.');
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const aluId = cuotaForm.alumna_id;
-      const mesNum = Number(cuotaForm.mes);
+      console.log('Iniciando cobro POS:', { alumna_id, monto, mes, metodo_pago });
+      
+      const mesNum = Number(mes);
       const year = currentDate.getFullYear();
-      const cuotasSnap = await getDocs(query(collection(db, 'cuotas'), where('alumna_id', '==', aluId), where('mes', '==', mesNum), where('anio', '==', year)));
-      if (cuotasSnap.empty) {
-        const newRef = doc(collection(db, 'cuotas'));
-        await setDoc(newRef, { id: newRef.id, alumna_id: aluId, mes: mesNum, anio: year, monto: Number(cuotaForm.monto), estado: 'pagado', metodo_pago: cuotaForm.metodo_pago, fecha_pago: currentDate });
+      
+      const payload = {
+        estado: 'pagado',
+        monto: Number(monto),
+        metodo_pago: metodo_pago,
+        fecha_pago: serverTimestamp(),
+        notas: 'Cobro rápido desde Mostrador (Caja Diaria)',
+        actualizado_el: serverTimestamp()
+      };
+
+      // 1. Check if fee already exists for this gymnast/month/year
+      const cuotasRef = collection(db, 'cuotas');
+      const q = query(
+        cuotasRef, 
+        where('alumna_id', '==', alumna_id), 
+        where('mes', '==', mesNum), 
+        where('anio', '==', year)
+      );
+      const qSnap = await getDocs(q);
+
+      if (!qSnap.empty) {
+        const cuotaDoc = qSnap.docs[0];
+        console.log('Actualizando cuota existente:', cuotaDoc.id);
+        await updateDoc(doc(db, 'cuotas', cuotaDoc.id), payload);
       } else {
-        const existing = cuotasSnap.docs[0];
-        await updateDoc(doc(db, 'cuotas', existing.id), { estado: 'pagado', monto: Number(cuotaForm.monto), metodo_pago: cuotaForm.metodo_pago, fecha_pago: currentDate });
+        const newRef = doc(cuotasRef);
+        await setDoc(newRef, {
+          id: newRef.id,
+          alumna_id,
+          mes: mesNum,
+          anio: year,
+          ...payload,
+          creado_el: serverTimestamp()
+        });
+        console.log('Nueva cuota creada:', newRef.id);
       }
-      setCuotaForm({...cuotaForm, alumna_id: '', monto: ''});
+
+      // Success
+      setCuotaForm({ ...cuotaForm, alumna_id: '', monto: '' });
       setSearchCuota('');
-      loadData();
-    } catch (err) { console.error(err); alert('Error al cobrar cuota'); } finally { setIsProcessing(false); }
+      await loadData();
+      alert('¡Cobro registrado con éxito!');
+    } catch (err) {
+      console.error('Error en handlePOSCuota:', err);
+      alert('Error al registrar el cobro: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handlePOSMerch = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    
+    const { producto_id, cantidad, metodo_pago } = merchForm;
+    
+    if (!producto_id) {
+      alert('Por favor, selecciona un producto.');
+      return;
+    }
+    if (!cantidad || cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0.');
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const prod = productos.find(p => p.id === merchForm.producto_id);
-      if (!prod) return;
-      const montoTotal = Number(prod.precio) * merchForm.cantidad;
-      const newRef = doc(collection(db, 'ventas_merch'));
-      await setDoc(newRef, { id: newRef.id, producto_id: prod.id, nombre_producto: prod.nombre, cantidad: merchForm.cantidad, monto: montoTotal, metodo_pago: merchForm.metodo_pago, fecha: currentDate });
-      await updateDoc(doc(db, 'productos', prod.id), { stock: prod.stock - merchForm.cantidad });
+      const prod = productos.find(p => p.id === producto_id);
+      if (!prod) throw new Error('Producto no encontrado en el inventario.');
+      
+      if (prod.stock < cantidad) {
+        if (!confirm(`Stock insuficiente (${prod.stock}). ¿Deseas continuar con la venta de todos modos?`)) {
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      const total = Number(prod.precio) * cantidad;
+      const ventaRef = doc(collection(db, 'ventas_merch'));
+      
+      await setDoc(ventaRef, {
+        id: ventaRef.id,
+        producto_id,
+        nombre_producto: prod.nombre,
+        cantidad,
+        monto: total,
+        metodo_pago,
+        fecha: serverTimestamp(),
+        tipo: 'kiosko',
+        creado_el: serverTimestamp()
+      });
+
+      // Update stock
+      await updateDoc(doc(db, 'productos', producto_id), {
+        stock: increment(-cantidad)
+      });
+
       setMerchForm({ producto_id: '', cantidad: 1, metodo_pago: 'efectivo' });
       setSearchMerch('');
-      loadData();
-    } catch (err) { console.error(err); alert('Error al vender merch'); } finally { setIsProcessing(false); }
+      await loadData();
+      alert('¡Venta realizada con éxito!');
+    } catch (err) {
+      console.error('Error en handlePOSMerch:', err);
+      alert('Error al registrar la venta: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handlePOSOtro = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    const { alumna_id, concepto, monto, metodo_pago } = otroForm;
+    if (!concepto || !monto) return;
+
     setIsProcessing(true);
     try {
       const newRef = doc(collection(db, 'otros_costos'));
-      await setDoc(newRef, { id: newRef.id, alumna_id: otroForm.alumna_id, concepto: otroForm.concepto, monto: Number(otroForm.monto), estado: 'pagado', metodo_pago: otroForm.metodo_pago, fecha: currentDate, notas: 'Ingreso Rápido' });
+      await setDoc(newRef, {
+        id: newRef.id,
+        alumna_id,
+        concepto: concepto.toUpperCase(),
+        monto: Number(monto),
+        estado: 'pagado',
+        metodo_pago,
+        fecha: serverTimestamp(),
+        notas: 'Ingreso rápido desde Mostrador'
+      });
+      
       setOtroForm({ alumna_id: '', concepto: '', monto: '', metodo_pago: 'efectivo' });
       setSearchOtro('');
-      loadData();
-    } catch (err) { console.error(err); alert('Error al cobrar otro costo'); } finally { setIsProcessing(false); }
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Error al registrar ingreso extra');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // ---------- SAVE ACTIONS ----------
   const handleSaveEgreso = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!egresoForm.concepto || !egresoForm.monto) return;
+    
     try {
       const ref = doc(collection(db, 'egresos'));
-      await setDoc(ref, { concepto: egresoForm.concepto, monto: Number(egresoForm.monto), metodo: egresoForm.metodo, fecha: currentDate });
+      await setDoc(ref, {
+        concepto: egresoForm.concepto.toUpperCase(),
+        monto: Number(egresoForm.monto),
+        metodo: egresoForm.metodo,
+        fecha: serverTimestamp()
+      });
       setShowEgreso(false);
       setEgresoForm({ concepto: '', monto: '', metodo: 'efectivo' });
-      loadData();
-    } catch (err) { console.error(err); alert('Error al guardar egreso'); }
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar egreso');
+    }
   };
 
   const handleUpdateCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await setDoc(doc(db, 'cajas', dateStr), { monto: Number(nuevoComienzo), fecha: currentDate });
+      await setDoc(doc(db, 'cajas', dateStr), {
+        monto: Number(nuevoComienzo),
+        fecha: serverTimestamp()
+      });
       setCajaFormOpen(false);
-      loadData();
-    } catch(err) { console.error(err); }
+      await loadData();
+    } catch(err) {
+      console.error(err);
+      alert('Error al actualizar inicio de caja');
+    }
   };
 
   const deleteEgreso = async (id: string) => {
-    if (!confirm('¿Eliminar registro?')) return;
-    await deleteDoc(doc(db, 'egresos', id));
-    loadData();
+    if (!confirm('¿Seguro que deseas eliminar este registro de egreso?')) return;
+    try {
+      await deleteDoc(doc(db, 'egresos', id));
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar');
+    }
   };
 
   const handleArqueo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const data: ArqueoData = { fecha: currentDate, esperado: cajaFinalEfvo, real: Number(efectivoReal), diferencia: Number(efectivoReal) - cajaFinalEfvo, usuario: 'Administración' };
+      const data: ArqueoData = {
+        fecha: serverTimestamp() as any,
+        esperado: cajaFinalEfvo,
+        real: Number(efectivoReal),
+        diferencia: Number(efectivoReal) - cajaFinalEfvo,
+        usuario: 'Administración'
+      };
       await setDoc(doc(db, 'arqueos', dateStr), data);
       setArqueoData(data);
       setShowArqueo(false);
       setEfectivoReal('');
-      alert('Arqueo de caja guardado con éxito');
-    } catch (err) { console.error(err); alert('Error al guardar arqueo'); }
+      alert('¡Arqueo de caja guardado con éxito!');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar arqueo');
+    }
   };
 
   // ---------- DAILY CALCULATIONS ----------
-  const isSameDay = (d: Date) => d >= startOfDay && d <= endOfDay;
+  const isSameDay = (d: Date) => {
+    return d.getFullYear() === currentDate.getFullYear() &&
+           d.getMonth() === currentDate.getMonth() &&
+           d.getDate() === currentDate.getDate();
+  };
 
-  const cuotasHoy = cuotas.filter(c => isSameDay(c.fecha_pago?.toDate()));
-  const otrosHoy = otrosCostos.filter(c => isSameDay(c.fecha?.toDate()));
-  const merchHoy = ventasMerch.filter(v => isSameDay(v.fecha?.toDate()));
+  const cuotasHoy = cuotas.filter(c => isSameDay(toDate(c.fecha_pago)));
+  const otrosHoy = otrosCostos.filter(c => isSameDay(toDate(c.fecha)));
+  const merchHoy = ventasMerch.filter(v => isSameDay(toDate(v.fecha)));
   const licenciasHoy = licencias.filter(l => isSameDay(toDate(l.fecha)));
   const inscripcionesFedHoy = inscripcionesFed.filter(i => isSameDay(toDate(i.fecha)));
   const matriculasHoy = matriculas.filter(m => isSameDay(toDate(m.fecha)));
   const segurosHoy = seguros.filter(s => isSameDay(toDate(s.fecha)));
   const torneosPagosHoy = torneosPagos.filter(t => isSameDay(toDate(t.fecha)));
-  const egresosHoy = egresos.filter(e => isSameDay(e.fecha.toDate()));
+  const egresosHoy = egresos.filter(e => isSameDay(toDate(e.fecha)));
 
   const allDayItems = [...cuotasHoy, ...otrosHoy, ...merchHoy, ...licenciasHoy, ...inscripcionesFedHoy, ...matriculasHoy, ...segurosHoy, ...torneosPagosHoy];
 
@@ -266,54 +421,57 @@ export function useCajaDiaria() {
   // ---------- MONTHLY CALCULATIONS ----------
   const allMonthItems = [...cuotas, ...otrosCostos, ...ventasMerch, ...licencias, ...inscripcionesFed, ...matriculas, ...seguros, ...torneosPagos];
 
-  const totCuotasEfvoMes = sumMonto(cuotas.filter(c => c.metodo_pago === 'efectivo'));
+  const totCuotasEfvoMes = sumMonto(cuotas.filter(c => getMetodo(c) === 'efectivo'));
   const totOtrosEfvoMes = sumMonto([...otrosCostos, ...ventasMerch, ...licencias, ...inscripcionesFed, ...matriculas, ...seguros, ...torneosPagos].filter(isEfectivo));
-  // BUG FIX: These 3 variables were referenced in the JSX but never defined
   const totDebitoMes = sumMonto(allMonthItems.filter(isDebito));
   const totTransfMes = sumMonto(allMonthItems.filter(isTransf));
   const totEgresosMes = sumMonto(egresos);
-  const totFinalMes = sumMonto(allMonthItems) - totEgresosMes;
+  const totFinalMes = (comienzoCaja + sumMonto(allMonthItems)) - totEgresosMes;
 
   // ---------- EXCEL EXPORT ----------
   const exportToExcel = () => {
     const dataIngresos = [
-      ...cuotas.map(c => ({ Fecha: c.fecha_pago?.toDate().toLocaleDateString('es-AR'), Tipo: 'CUOTA', Metodo: getMetodo(c).toUpperCase(), Monto: c.monto, Concepto: `MES ${c.mes}/${c.anio}`, Gimnasta: alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'N/A' })),
-      ...otrosCostos.map(o => ({ Fecha: o.fecha?.toDate().toLocaleDateString('es-AR'), Tipo: 'OTRO', Metodo: getMetodo(o).toUpperCase(), Monto: o.monto, Concepto: (o.concepto || '').toUpperCase(), Gimnasta: alumnas.find(a => a.id === o.alumna_id)?.nombre_completo || 'N/A' })),
-      ...ventasMerch.map(v => ({ Fecha: v.fecha?.toDate().toLocaleDateString('es-AR'), Tipo: 'INDUMENTARIA/KIOSKO', Metodo: getMetodo(v).toUpperCase(), Monto: v.monto, Concepto: (v.nombre_producto || v.concepto || '').toUpperCase(), Gimnasta: 'VENTA MOSTRADOR' })),
-      ...licencias.map(l => ({ Fecha: toDate(l.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION (LICENCIA)', Metodo: (l.metodo || 'EFECTIVO').toUpperCase(), Monto: l.monto, Concepto: 'LICENCIA ANUAL', Gimnasta: (l.alumna_nombre || '').toUpperCase() })),
-      ...inscripcionesFed.map(i => ({ Fecha: toDate(i.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION (INSCRIPCION)', Metodo: (i.metodo || 'EFECTIVO').toUpperCase(), Monto: i.monto, Concepto: 'INSCRIPCION TORNEO', Gimnasta: (i.alumna_nombre || '').toUpperCase() })),
-      ...matriculas.map(m => ({ Fecha: toDate(m.fecha).toLocaleDateString('es-AR'), Tipo: 'MATRICULA', Metodo: (m.metodo || 'EFECTIVO').toUpperCase(), Monto: m.monto, Concepto: 'PAGO MATRICULA', Gimnasta: (m.alumna_nombre || '').toUpperCase() })),
-      ...seguros.map(s => ({ Fecha: toDate(s.fecha).toLocaleDateString('es-AR'), Tipo: 'SEGURO', Metodo: (s.metodo || 'EFECTIVO').toUpperCase(), Monto: s.monto, Concepto: 'PAGO SEGURO', Gimnasta: (s.alumna_nombre || '').toUpperCase() })),
-      ...torneosPagos.map(t => ({ Fecha: toDate(t.fecha).toLocaleDateString('es-AR'), Tipo: 'TORNEO INTERNO', Metodo: (t.metodo || 'EFECTIVO').toUpperCase(), Monto: t.monto, Concepto: (t.categoria || 'TORNEO').toUpperCase(), Gimnasta: (t.alumna_nombre || '').toUpperCase() })),
+      ...cuotas.map(c => ({ Fecha: toDate(c.fecha_pago).toLocaleDateString('es-AR'), Tipo: 'CUOTA', Metodo: getMetodo(c).toUpperCase(), Monto: c.monto, Concepto: `MES ${c.mes}/${c.anio}`, Gimnasta: alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'N/A' })),
+      ...otrosCostos.map(o => ({ Fecha: toDate(o.fecha).toLocaleDateString('es-AR'), Tipo: 'OTRO', Metodo: getMetodo(o).toUpperCase(), Monto: o.monto, Concepto: (o.concepto || '').toUpperCase(), Gimnasta: alumnas.find(a => a.id === o.alumna_id)?.nombre_completo || 'N/A' })),
+      ...ventasMerch.map(v => ({ Fecha: toDate(v.fecha).toLocaleDateString('es-AR'), Tipo: 'INDUMENTARIA/KIOSKO', Metodo: getMetodo(v).toUpperCase(), Monto: v.monto, Concepto: (v.nombre_producto || v.concepto || '').toUpperCase(), Gimnasta: 'VENTA MOSTRADOR' })),
+      ...licencias.map(l => ({ Fecha: toDate(l.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION (LICENCIA)', Metodo: getMetodo(l).toUpperCase(), Monto: l.monto, Concepto: 'LICENCIA ANUAL', Gimnasta: (l.alumna_nombre || '').toUpperCase() })),
+      ...inscripcionesFed.map(i => ({ Fecha: toDate(i.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION (INSCRIPCION)', Metodo: getMetodo(i).toUpperCase(), Monto: i.monto, Concepto: 'INSCRIPCION TORNEO', Gimnasta: (i.alumna_nombre || '').toUpperCase() })),
+      ...matriculas.map(m => ({ Fecha: toDate(m.fecha).toLocaleDateString('es-AR'), Tipo: 'MATRICULA', Metodo: getMetodo(m).toUpperCase(), Monto: m.monto, Concepto: 'PAGO MATRICULA', Gimnasta: (m.alumna_nombre || '').toUpperCase() })),
+      ...seguros.map(s => ({ Fecha: toDate(s.fecha).toLocaleDateString('es-AR'), Tipo: 'SEGURO', Metodo: getMetodo(s).toUpperCase(), Monto: s.monto, Concepto: 'PAGO SEGURO', Gimnasta: (s.alumna_nombre || '').toUpperCase() })),
+      ...torneosPagos.map(t => ({ Fecha: toDate(t.fecha).toLocaleDateString('es-AR'), Tipo: 'TORNEO INTERNO', Metodo: getMetodo(t).toUpperCase(), Monto: t.monto, Concepto: (t.categoria || 'TORNEO').toUpperCase(), Gimnasta: (t.alumna_nombre || '').toUpperCase() })),
     ];
-    dataIngresos.sort((a, b) => { const pA = a.Fecha.split('/'); const pB = b.Fecha.split('/'); return new Date(+pA[2],+pA[1]-1,+pA[0]).getTime() - new Date(+pB[2],+pB[1]-1,+pB[0]).getTime(); });
+    dataIngresos.sort((a, b) => { 
+      const pA = a.Fecha.split('/'); 
+      const pB = b.Fecha.split('/'); 
+      return new Date(+pA[2],+pA[1]-1,+pA[0]).getTime() - new Date(+pB[2],+pB[1]-1,+pB[0]).getTime(); 
+    });
 
-    const dataEgresos = egresos.map(e => ({ Fecha: e.fecha.toDate().toLocaleDateString('es-AR'), Concepto: e.concepto.toUpperCase(), Metodo: e.metodo.toUpperCase(), Monto: e.monto }));
+    const dataEgresos = egresos.map(e => ({ Fecha: toDate(e.fecha).toLocaleDateString('es-AR'), Concepto: e.concepto.toUpperCase(), Metodo: e.metodo.toUpperCase(), Monto: e.monto }));
+    
     const tE = sumMonto(dataIngresos.filter(i => i.Metodo === 'EFECTIVO'));
     const tD = sumMonto(dataIngresos.filter(i => i.Metodo === 'DEBITO'));
-    const tT = sumMonto(dataIngresos.filter(i => i.Metodo === 'TRANSFERENCIA' || i.Metodo === 'MP'));
+    const tT = sumMonto(dataIngresos.filter(i => i.Metodo === 'TRANSFERENCIA' || i.Metodo === 'MP' || i.Metodo === 'MERCADO PAGO'));
     const tEgr = dataEgresos.reduce((a,b) => a + b.Monto, 0);
 
     const dataResumen = [
-      { Categoria: 'INGRESOS EFECTIVO', Monto: tE }, { Categoria: 'INGRESOS DEBITO', Monto: tD },
-      { Categoria: 'INGRESOS TRANSFERENCIA/MP', Monto: tT }, { Categoria: '', Monto: '' },
-      { Categoria: 'TOTAL INGRESOS', Monto: tE + tD + tT }, { Categoria: 'TOTAL EGRESOS (SE SACO DE CAJA)', Monto: tEgr },
-      { Categoria: '', Monto: '' }, { Categoria: 'BALANCE NETO', Monto: (tE + tD + tT) - tEgr }
+      { Categoria: 'INGRESOS EFECTIVO', Monto: tE },
+      { Categoria: 'INGRESOS DEBITO', Monto: tD },
+      { Categoria: 'INGRESOS TRANSFERENCIA/MP', Monto: tT },
+      { Categoria: '', Monto: '' },
+      { Categoria: 'TOTAL INGRESOS', Monto: tE + tD + tT },
+      { Categoria: 'TOTAL EGRESOS (SE SACO DE CAJA)', Monto: tEgr },
+      { Categoria: '', Monto: '' },
+      { Categoria: 'BALANCE NETO', Monto: (tE + tD + tT) - tEgr }
     ];
 
     const wb = XLSX.utils.book_new();
     
-    // Format amounts as numbers for better Excel support
     const formatSheet = (ws: any) => {
       const range = XLSX.utils.decode_range(ws['!ref'] || "A1:A1");
       for (let R = range.s.r + 1; R <= range.e.r; ++R) {
         for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cellAddress = {c: C, r: R};
-          const cellRef = XLSX.utils.encode_cell(cellAddress);
-          const cell = ws[cellRef];
-          if (cell && cell.t === 'n') {
-            cell.z = '"$"#,##0.00'; // Currency format
-          }
+          const cell = ws[XLSX.utils.encode_cell({c: C, r: R})];
+          if (cell && cell.t === 'n') cell.z = '"$"#,##0.00';
         }
       }
       return ws;
