@@ -77,11 +77,16 @@ export default function Torneos() {
   const handleSavePago = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const parsedMonto = parseFloat(pagoForm.monto.replace(',', '.')) || 0;
+      const parsedMonto = typeof pagoForm.monto === 'string' 
+        ? parseFloat(pagoForm.monto.replace(',', '.')) 
+        : parseFloat(pagoForm.monto);
+      
       const payload = {
         ...pagoForm,
+        alumna_nombre: (pagoForm.alumna_nombre || 'S/N').toString().toUpperCase(),
+        categoria: (pagoForm.categoria || '').toString().toUpperCase(),
         torneo_id: selectedTorneo.id,
-        monto: parsedMonto,
+        monto: parsedMonto || 0,
         fecha: new Date(pagoForm.fecha),
         tipo: 'torneo'
       };

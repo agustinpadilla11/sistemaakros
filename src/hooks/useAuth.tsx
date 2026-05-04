@@ -41,11 +41,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return unsubscribe;
   }, []);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = async (userId: string, retries = 3) => {
     try {
       const userDoc = await getDoc(doc(db, 'usuarios', userId));
       if (userDoc.exists()) {
         setUserData({ id: userDoc.id, uid: userDoc.id, ...userDoc.data() } as Usuario);
+      } else if (retries > 0) {
+        // El doc puede tardar un instante en estar disponible (ej: recién registrado)
+        await new Promise(resolve => setTimeout(resolve, 800));
+        return fetchUserData(userId, retries - 1);
       } else {
         console.error("No se encontró el documento del usuario en Firestore");
         setUserData(null);

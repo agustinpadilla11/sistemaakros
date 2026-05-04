@@ -56,9 +56,13 @@ export default function Seguro() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const parsedMonto = typeof form.monto === 'string'
+        ? parseFloat(form.monto.replace(',', '.'))
+        : parseFloat(form.monto);
+
       const payload = {
-        alumna_nombre: form.alumna_nombre,
-        monto: parseFloat(form.monto) || 0,
+        alumna_nombre: (form.alumna_nombre || 'S/N').toString().toUpperCase(),
+        monto: parsedMonto || 0,
         metodo: form.metodo,
         fecha: new Date(form.fecha),
         notas: form.notas,

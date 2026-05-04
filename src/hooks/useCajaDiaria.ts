@@ -51,7 +51,7 @@ export function useCajaDiaria() {
   // POS State
   const [posTab, setPosTab] = useState<'cuota'|'merch'|'otro'>('cuota');
   const [cuotaForm, setCuotaForm] = useState({ alumna_id: '', mes: (new Date().getMonth()+1).toString(), monto: '', metodo_pago: 'efectivo' });
-  const [merchForm, setMerchForm] = useState({ producto_id: '', cantidad: 1, metodo_pago: 'efectivo' });
+  const [merchForm, setMerchForm] = useState({ producto_id: '', cantidad: 1, monto: '', metodo_pago: 'efectivo' });
   const [otroForm, setOtroForm] = useState({ alumna_id: '', concepto: '', monto: '', metodo_pago: 'efectivo' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchCuota, setSearchCuota] = useState('');
@@ -184,9 +184,13 @@ export function useCajaDiaria() {
       const mesNum = Number(mes);
       const year = currentDate.getFullYear();
       
+      const parsedMonto = typeof monto === 'string'
+        ? parseFloat(monto.replace(',', '.'))
+        : Number(monto);
+
       const payload = {
         estado: 'pagado',
-        monto: Number(monto),
+        monto: parsedMonto || 0,
         metodo_pago: metodo_pago,
         fecha_pago: serverTimestamp(),
         notas: 'Cobro rápido desde Mostrador (Caja Diaria)',
@@ -259,7 +263,7 @@ export function useCajaDiaria() {
         }
       }
 
-      const total = Number(prod.precio) * cantidad;
+      const total = Number(merchForm.monto) > 0 ? Number(merchForm.monto) : Number(prod.precio) * cantidad;
       const ventaRef = doc(collection(db, 'ventas_merch'));
       
       await setDoc(ventaRef, {
@@ -279,7 +283,7 @@ export function useCajaDiaria() {
         stock: increment(-cantidad)
       });
 
-      setMerchForm({ producto_id: '', cantidad: 1, metodo_pago: 'efectivo' });
+      setMerchForm({ producto_id: '', cantidad: 1, monto: '', metodo_pago: 'efectivo' });
       setSearchMerch('');
       await loadData();
       alert('¡Venta realizada con éxito!');
@@ -298,12 +302,16 @@ export function useCajaDiaria() {
 
     setIsProcessing(true);
     try {
+      const parsedMonto = typeof monto === 'string'
+        ? parseFloat(monto.replace(',', '.'))
+        : Number(monto);
+
       const newRef = doc(collection(db, 'otros_costos'));
       await setDoc(newRef, {
         id: newRef.id,
         alumna_id,
         concepto: concepto.toUpperCase(),
-        monto: Number(monto),
+        monto: parsedMonto || 0,
         estado: 'pagado',
         metodo_pago,
         fecha: serverTimestamp(),

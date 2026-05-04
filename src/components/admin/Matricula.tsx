@@ -59,9 +59,13 @@ export default function Matricula() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Robust decimal parsing
+      const cleanedMonto = form.monto.replace(',', '.');
+      const parsedMonto = parseFloat(cleanedMonto) || 0;
+
       const payload = {
-        alumna_nombre: form.alumna_nombre,
-        monto: parseFloat(form.monto) || 0,
+        alumna_nombre: form.alumna_nombre.toUpperCase(),
+        monto: parsedMonto,
         metodo: form.metodo,
         fecha: new Date(form.fecha),
         notas: form.notas,
@@ -77,8 +81,8 @@ export default function Matricula() {
       setIsEditing(null);
       loadData();
     } catch (err) {
-      console.error(err);
-      alert('Error al guardar');
+      console.error('Error al guardar:', err);
+      alert('Error al guardar. Verifica los permisos de la base de datos.');
     }
   };
 

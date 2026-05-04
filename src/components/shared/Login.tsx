@@ -25,10 +25,19 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       // navigation handled by AuthProvider state change
     } catch (err: any) {
-      setError('Credenciales inválidas o error de red. ' + err.message);
+      const code = err.code || '';
+      if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
+        setError('Email o contraseña incorrectos. Verificá que estén bien escritos.');
+      } else if (code.includes('too-many-requests')) {
+        setError('Demasiados intentos fallidos. Esperá unos minutos e intentá de nuevo.');
+      } else if (code.includes('network')) {
+        setError('Error de red. Verificá tu conexión a internet.');
+      } else {
+        setError('Error al iniciar sesión: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }

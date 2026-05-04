@@ -158,7 +158,7 @@ export default function CajaDiaria() {
                      e.preventDefault();
                      handlePOSMerch(e);
                    }} 
-                   className="grid grid-cols-5 gap-3 items-end"
+                   className="grid grid-cols-6 gap-3 items-end"
                  >
                     <div className="col-span-2 relative">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Producto</label>
@@ -188,7 +188,7 @@ export default function CajaDiaria() {
                                 type="button"
                                 onClick={() => {
                                   setSearchMerch(p.nombre);
-                                  setMerchForm({...merchForm, producto_id: p.id});
+                                  setMerchForm({...merchForm, producto_id: p.id, monto: (p.precio * merchForm.cantidad).toString()});
                                 }}
                                 className="w-full text-left px-3 py-2.5 text-xs font-bold uppercase hover:bg-emerald-50 text-slate-700 border-b border-slate-50 last:border-0"
                               >
@@ -204,7 +204,16 @@ export default function CajaDiaria() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unidades</label>
-                      <input type="number" required min="1" value={merchForm.cantidad} onChange={e=>setMerchForm({...merchForm, cantidad: Number(e.target.value)})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" />
+                      <input type="number" required min="1" value={merchForm.cantidad} onChange={e=>{
+                        const nuevaCantidad = Number(e.target.value);
+                        const prod = productos.find(p => p.id === merchForm.producto_id);
+                        const nuevoMonto = prod ? (prod.precio * nuevaCantidad).toString() : merchForm.monto;
+                        setMerchForm({...merchForm, cantidad: nuevaCantidad, monto: nuevoMonto});
+                      }} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Monto ($)</label>
+                      <input type="number" required value={merchForm.monto} onChange={e=>setMerchForm({...merchForm, monto: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" placeholder="Ej: 500" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>

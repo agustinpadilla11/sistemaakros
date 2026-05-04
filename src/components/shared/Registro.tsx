@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
 
 export default function Registro() {
@@ -24,12 +24,12 @@ export default function Registro() {
       const isAdmin = email.toLowerCase() === 'mpatojardel@gmail.com';
       
       await setDoc(doc(db, 'usuarios', user.uid), {
-        id: user.uid,
+        uid: user.uid,
         email,
         nombre,
         telefono: '',
         rol: isAdmin ? 'admin' : 'padre',
-        creado_en: new Date().toISOString()
+        creado_en: serverTimestamp()
       });
 
       navigate(isAdmin ? '/admin' : '/portal');

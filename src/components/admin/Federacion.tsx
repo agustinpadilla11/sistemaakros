@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Plus, Edit, Trash2, CheckSquare, Calendar, ChevronLeft, ChevronRight, Download, Search, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -9,7 +9,8 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', '
 
 export default function Federacion() {
   const { userData } = useAuth();
-  if (!userData) return null;
+
+  // ─── Todos los hooks PRIMERO (regla de React: no llamar hooks después de return) ───
   const [activeTab, setActiveTab] = useState<'licencias' | 'inscripciones'>('licencias');
   const [loading, setLoading] = useState(true);
   const [alumnas, setAlumnas] = useState<any[]>([]);
@@ -24,13 +25,22 @@ export default function Federacion() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
+  // Fecha local (no UTC) para evitar que el día quede un día atrás en Argentina (UTC-3)
+  const getTodayLocal = () => {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  };
+
   const [form, setForm] = useState({
     alumna_nombre: '',
     monto: '',
     metodo: 'efectivo',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: getTodayLocal(),
     notas: ''
   });
+
+  // Early return DESPUÉS de todos los hooks
+  if (!userData) return null;
 
   const loadData = async () => {
     setLoading(true);
@@ -62,13 +72,22 @@ export default function Federacion() {
     e.preventDefault();
     try {
       const collectionName = activeTab === 'licencias' ? 'federacion_licencias' : 'federacion_inscripciones';
+      
+      // Parseo robusto del monto
+      const cleanedMonto = form.monto.replace(',', '.');
+      const parsedMonto = parseFloat(cleanedMonto) || 0;
+
+      // Parsear fecha como hora LOCAL (no UTC) para evitar el corrimiento de zona horaria en Argentina
+      const [year, month, day] = form.fecha.split('-').map(Number);
+      const fechaLocal = new Date(year, month - 1, day); // medianoche local
+
       const payload = {
-        alumna_nombre: form.alumna_nombre,
-        monto: parseFloat(form.monto) || 0,
+        alumna_nombre: form.alumna_nombre.toUpperCase(),
+        monto: parsedMonto,
         metodo: form.metodo,
-        fecha: new Date(form.fecha),
+        fecha: fechaLocal,
         notas: form.notas,
-        tipo: activeTab // para caja diaria
+        tipo: activeTab === 'licencias' ? 'licencia' : 'inscripcion'
       };
 
       if (isEditing === 'nuevo') {
@@ -79,9 +98,12 @@ export default function Federacion() {
       }
       setIsEditing(null);
       loadData();
-    } catch (err) {
-      console.error(err);
-      alert('Error al guardar');
+    } catch (err: any) {
+      console.error('Error al guardar:', err);
+      const msg = err?.code === 'permission-denied'
+        ? 'Sin permisos: asegurate de estar logueado como administrador.'
+        : 'Error al guardar: ' + (err?.message || err);
+      alert(msg);
     }
   };
 
@@ -204,7 +226,7 @@ export default function Federacion() {
         </div>
         <button 
           onClick={() => { 
-            setForm({alumna_nombre: '', monto: '', metodo: 'efectivo', fecha: new Date().toISOString().split('T')[0], notas: ''}); 
+            setForm({alumna_nombre: '', monto: '', metodo: 'efectivo', fecha: getTodayLocal(), notas: ''}); 
             setSearchTerm('');
             setIsEditing('nuevo'); 
           }}
