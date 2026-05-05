@@ -14,20 +14,22 @@ export default function CajaDiaria() {
     loading, formatter, exportToExcel, MESES,
     comienzoCaja, alumnas, productos,
     posTab, setPosTab,
-    cuotaForm, setCuotaForm, merchForm, setMerchForm,
-    isProcessing, searchCuota, setSearchCuota, searchMerch, setSearchMerch,
-    handlePOSCuota, handlePOSMerch,
+    cuotaForm, setCuotaForm, merchForm, setMerchForm, otroForm, setOtroForm,
+    isProcessing, searchCuota, setSearchCuota, searchMerch, setSearchMerch, searchOtro, setSearchOtro,
+    handlePOSCuota, handlePOSMerch, handlePOSOtro,
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
     showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, arqueoData, handleArqueo,
     deleteEgreso,
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
-    matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy,
+    matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy, allDayItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,
     totalIngresosGralHoy, totalEgresosGralHoy,
-    cajaFinalEfvo, totalFinalTodo,
-    totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes,
+    cajaFinalEfvo, cajaFinalDebito, cajaFinalTransf, totalFinalTodo,
+    totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes, resetDailyData
   } = caja;
+
+  const getMetodo = (item: any) => item.metodo_pago || item.metodo || 'efectivo';
 
   return (
     <div className="space-y-6">
@@ -47,6 +49,9 @@ export default function CajaDiaria() {
         <div className="flex gap-3">
           <button onClick={exportToExcel} className="bg-emerald-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-700 flex items-center gap-2">
              <Download className="w-3 h-3" /> Exportar Excel
+          </button>
+          <button onClick={resetDailyData} disabled={isProcessing} className="bg-red-100 text-red-600 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-red-200 flex items-center gap-2 disabled:opacity-50">
+            <Trash2 className="w-3 h-3" /> Limpiar Día
           </button>
           <button onClick={() => { setNuevoComienzo(comienzoCaja.toString()); setCajaFormOpen(true); }} className="bg-slate-100 text-slate-600 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 flex items-center gap-2">
             <Calculator className="w-3 h-3" /> Modificar Comienzo
@@ -84,6 +89,7 @@ export default function CajaDiaria() {
                     <div className="col-span-2 relative">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Gimnasta</label>
                       <input 
+                        list="alumnas-list"
                         type="text" 
                         required 
                         value={searchCuota}
@@ -99,29 +105,11 @@ export default function CajaDiaria() {
                         placeholder="Ej: Pérez María..."
                         className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
                       />
-                      {searchCuota.length >= 2 && !cuotaForm.alumna_id && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-purple-100 rounded shadow-2xl max-h-48 overflow-y-auto">
-                          {alumnas
-                            .filter(a => a.nombre_completo.toLowerCase().includes(searchCuota.toLowerCase()))
-                            .map(a => (
-                              <button
-                                key={a.id}
-                                type="button"
-                                onClick={() => {
-                                  setSearchCuota(a.nombre_completo);
-                                  setCuotaForm({...cuotaForm, alumna_id: a.id});
-                                }}
-                                className="w-full text-left px-3 py-2.5 text-xs font-bold uppercase hover:bg-purple-50 text-slate-700 border-b border-slate-50 last:border-0"
-                              >
-                                {a.nombre_completo}
-                              </button>
-                            ))
-                          }
-                          {alumnas.filter(a => a.nombre_completo.toLowerCase().includes(searchCuota.toLowerCase())).length === 0 && (
-                            <div className="p-3 text-[10px] uppercase font-bold text-slate-400">No se encontraron resultados</div>
-                          )}
-                        </div>
-                      )}
+                      <datalist id="alumnas-list">
+                        {alumnas.map(a => (
+                          <option key={a.id} value={a.nombre_completo} />
+                        ))}
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mes</label>
@@ -163,6 +151,7 @@ export default function CajaDiaria() {
                     <div className="col-span-2 relative">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Producto</label>
                       <input 
+                        list="productos-list"
                         type="text" 
                         required 
                         value={searchMerch}
@@ -173,34 +162,20 @@ export default function CajaDiaria() {
                           const matched = productos.find(p => 
                             p.nombre.trim().toLowerCase() === val.trim().toLowerCase()
                           );
-                          setMerchForm({...merchForm, producto_id: matched ? matched.id : ''});
+                          setMerchForm({
+                            ...merchForm, 
+                            producto_id: matched ? matched.id : '',
+                            monto: matched ? (matched.precio * merchForm.cantidad).toString() : merchForm.monto
+                          });
                         }}
                         placeholder="Ej: Turrón..."
                         className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
                       />
-                      {searchMerch.length >= 2 && !merchForm.producto_id && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-purple-100 rounded shadow-2xl max-h-48 overflow-y-auto">
-                          {productos
-                            .filter(p => p.nombre.toLowerCase().includes(searchMerch.toLowerCase()))
-                            .map(p => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => {
-                                  setSearchMerch(p.nombre);
-                                  setMerchForm({...merchForm, producto_id: p.id, monto: (p.precio * merchForm.cantidad).toString()});
-                                }}
-                                className="w-full text-left px-3 py-2.5 text-xs font-bold uppercase hover:bg-emerald-50 text-slate-700 border-b border-slate-50 last:border-0"
-                              >
-                                {p.nombre} - ${p.precio} (Stk: {p.stock})
-                              </button>
-                            ))
-                          }
-                          {productos.filter(p => p.nombre.toLowerCase().includes(searchMerch.toLowerCase())).length === 0 && (
-                            <div className="p-3 text-[10px] uppercase font-bold text-slate-400">No hay productos</div>
-                          )}
-                        </div>
-                      )}
+                      <datalist id="productos-list">
+                        {productos.map(p => (
+                          <option key={p.id} value={p.nombre} />
+                        ))}
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unidades</label>
@@ -240,20 +215,46 @@ export default function CajaDiaria() {
                      e.preventDefault();
                      handlePOSOtro(e);
                    }} 
-                   className="grid grid-cols-5 gap-3 items-end"
+                   className="grid grid-cols-6 gap-3 items-end"
                  >
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Concepto / Varios</label>
+                    <div className="col-span-2 relative">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Gimnasta (Opcional)</label>
+                      <input
+                        type="text"
+                        list="alumnas-list-otro"
+                        value={searchOtro}
+                        onChange={(e) => {
+                          setSearchOtro(e.target.value);
+                          const matchingAlumna = alumnas.find(a => 
+                            a.nombre_completo.toLowerCase() === e.target.value.toLowerCase()
+                          );
+                          setOtroForm({
+                            ...otroForm,
+                            alumna_id: matchingAlumna ? matchingAlumna.id : ''
+                          });
+                        }}
+                        className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white pr-8"
+                        placeholder="Escribir nombre..."
+                      />
+                      <datalist id="alumnas-list-otro">
+                        {alumnas.map(a => (
+                          <option key={a.id} value={a.nombre_completo} />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div className="col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Concepto</label>
                       <input 
                         type="text" 
                         required 
                         value={otroForm.concepto} 
                         onChange={e=>setOtroForm({...otroForm, concepto: e.target.value})} 
                         className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
-                        placeholder="Ej: Inscripción, Gaseosa, etc..." 
+                        placeholder="Inscrip..." 
                       />
                     </div>
-                    <div>
+                    <div className="col-span-1">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Monto ($)</label>
                       <input 
                         type="number" 
@@ -263,7 +264,7 @@ export default function CajaDiaria() {
                         className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
                       />
                     </div>
-                    <div>
+                    <div className="col-span-1">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
                       <select required value={otroForm.metodo_pago} onChange={e=>setOtroForm({...otroForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
                          <option value="efectivo">EFVO</option>
@@ -271,13 +272,13 @@ export default function CajaDiaria() {
                          <option value="transferencia">Transferencia</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="col-span-1">
                       <button 
                         type="submit" 
-                        disabled={isProcessing} 
-                        className="w-full bg-slate-800 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                        disabled={isProcessing || !otroForm.concepto || !otroForm.monto} 
+                        className="w-full bg-emerald-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm active:scale-95 disabled:opacity-50"
                       >
-                         {isProcessing ? 'Procesando...' : 'Cargar'}
+                         {isProcessing ? 'Proc...' : 'Cobrar'}
                       </button>
                     </div>
                  </form>
@@ -308,137 +309,213 @@ export default function CajaDiaria() {
              </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-slate-800 text-white p-5 rounded-xl shadow-md flex justify-between items-center">
-               <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">TOTAL FINAL (Todo Sumado)</p>
-                  <p className="text-2xl font-black">{formatter.format(totalFinalTodo)}</p>
-               </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Efectivo</p>
+               <p className="text-2xl font-black text-emerald-400 relative z-10">{formatter.format(cajaFinalEfvo)}</p>
+            </div>
+            <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Débito</p>
+               <p className="text-2xl font-black text-blue-400 relative z-10">{formatter.format(cajaFinalDebito)}</p>
+            </div>
+            <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Transf.</p>
+               <p className="text-2xl font-black text-indigo-400 relative z-10">{formatter.format(cajaFinalTransf)}</p>
+            </div>
+            <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg border border-slate-700 flex flex-col justify-center relative overflow-hidden">
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Total Consolidado</p>
+               <p className="text-3xl font-black text-white relative z-10">{formatter.format(totalFinalTodo)}</p>
             </div>
             
-            <div className={`p-5 rounded-xl shadow-md flex justify-between items-center border-2 ${arqueoData ? 'bg-white border-emerald-500' : 'bg-white border-dashed border-slate-300'}`}>
-               <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">ARQUEO DE CIERRE</p>
+            <div className={`p-4 rounded-xl shadow-md flex justify-between items-center border-2 ${arqueoData ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-dashed border-slate-300'}`}>
+               <div className="w-full">
+                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">ARQUEO DE CIERRE</p>
                   {arqueoData ? (
-                    <div className="flex items-center gap-4 mt-1">
-                      <div>
-                        <p className="text-xs text-slate-500 font-bold uppercase">Real en caja:</p>
-                        <p className="text-lg font-black text-slate-800">{formatter.format(arqueoData.real)}</p>
+                    <div className="flex flex-col gap-1 mt-2">
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Real en caja:</p>
+                        <p className="text-sm font-black text-slate-800">{formatter.format(arqueoData.real)}</p>
                       </div>
-                      <div className={`px-3 py-1 rounded text-xs font-bold uppercase ${arqueoData.diferencia === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase text-center w-full mt-1 ${arqueoData.diferencia === 0 ? 'bg-emerald-200 text-emerald-800' : 'bg-red-100 text-red-700'}`}>
                         {arqueoData.diferencia === 0 ? 'Caja Cerrada OK' : `Dif: ${formatter.format(arqueoData.diferencia)}`}
                       </div>
                     </div>
                   ) : (
-                    <button onClick={() => setShowArqueo(true)} className="mt-2 bg-purple-600 text-white px-6 py-2 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2">
-                       <CheckCircle2 className="w-4 h-4" /> Realizar Arqueo
+                    <button onClick={() => setShowArqueo(true)} className="mt-3 w-full bg-purple-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center justify-center gap-2">
+                       <CheckCircle2 className="w-3 h-3" /> Realizar Arqueo
                     </button>
                   )}
                </div>
-               {arqueoData && <CheckCircle2 className="w-8 h-8 text-emerald-500" />}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-               <div className="p-4 border-b border-slate-100 bg-slate-50">
-                 <h3 className="text-xs font-bold uppercase tracking-tight text-emerald-700">Detalle Ingresos de Hoy</h3>
-               </div>
-               <div className="p-0 overflow-y-auto max-h-80">
-                 <table className="w-full text-left bg-white">
-                   <tbody className="divide-y divide-slate-100">
-                     {cuotasHoy.map(c => (
-                        <tr key={c.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Cuota - {alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'Desconocida'}</td>
-                          <td className="p-3 text-xs font-bold uppercase">{c.metodo_pago}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(c.monto)}</td>
-                        </tr>
-                     ))}
-                     {otrosHoy.map(o => (
-                        <tr key={o.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Otros: {o.concepto}</td>
-                          <td className="p-3 text-xs font-bold uppercase">{o.metodo_pago || o.metodo || 'efectivo'}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(o.monto)}</td>
-                        </tr>
-                     ))}
-                     {merchHoy.map(m => (
-                        <tr key={m.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">
-                             {m.tipo === 'merch' 
-                               ? `Otros (Merch): ${m.concepto} ${m.talle ? `(Talle ${m.talle})` : ''} - ${m.alumna_nombre}` 
-                               : `Otros (Kiosko): ${m.nombre_producto} (x${m.cantidad})`}
-                          </td>
-                          <td className="p-3 text-xs font-bold uppercase">{m.metodo_pago || m.metodo || 'efectivo'}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
-                        </tr>
-                     ))}
-                     {licenciasHoy.map(l => (
-                        <tr key={l.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Fed (Licencia): {l.alumna_nombre}</td>
-                          <td className="p-3 text-xs font-bold uppercase">{l.metodo}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(l.monto)}</td>
-                        </tr>
-                     ))}
-                     {inscripcionesFedHoy.map(i => (
-                        <tr key={i.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Fed (Inscripción): {i.alumna_nombre}</td>
-                          <td className="p-3 text-xs font-bold uppercase">{i.metodo}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(i.monto)}</td>
-                        </tr>
-                     ))}
-                     {matriculasHoy.map(m => (
-                        <tr key={m.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Matrícula: {m.alumna_nombre}</td>
-                          <td className="p-3 text-xs font-bold uppercase">{m.metodo}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
-                        </tr>
-                     ))}
-                     {segurosHoy.map(s => (
-                        <tr key={s.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Seguro: {s.alumna_nombre}</td>
-                          <td className="p-3 text-xs font-bold uppercase">{s.metodo}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(s.monto)}</td>
-                        </tr>
-                     ))}
-                     {torneosPagosHoy.map(t => (
-                        <tr key={t.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-500 uppercase">Torneo: {t.alumna_nombre} ({t.categoria})</td>
-                          <td className="p-3 text-xs font-bold uppercase">{t.metodo}</td>
-                          <td className="p-3 text-xs font-black text-emerald-600 text-right">{formatter.format(t.monto)}</td>
-                        </tr>
-                     ))}
-                     {cuotasHoy.length === 0 && otrosHoy.length === 0 && merchHoy.length === 0 && licenciasHoy.length === 0 && inscripcionesFedHoy.length === 0 && matriculasHoy.length === 0 && segurosHoy.length === 0 && torneosPagosHoy.length === 0 && (
-                       <tr><td colSpan={3} className="p-6 text-center text-[10px] font-bold uppercase text-slate-400">Sin ingresos hoy</td></tr>
-                     )}
-                   </tbody>
-                 </table>
-               </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50">
-                  <h3 className="text-xs font-bold uppercase tracking-tight text-red-700">Detalle Salidas de Caja de Hoy</h3>
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-emerald-50/50 flex justify-between items-center">
+                  <h3 className="text-xs font-black uppercase tracking-tight text-emerald-700">Detalle Ingresos de Hoy</h3>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">{allDayItems.length} Mvts</span>
                 </div>
-               <div className="p-0 overflow-y-auto max-h-80">
-                 <table className="w-full text-left bg-white">
-                   <tbody className="divide-y divide-slate-100">
-                     {egresosHoy.map(e => (
-                        <tr key={e.id}>
-                          <td className="p-3 text-[10px] font-bold text-slate-600 uppercase">{e.concepto}</td>
-                          <td className="p-3 text-[10px] font-bold uppercase text-slate-400">{e.metodo}</td>
-                          <td className="p-3 text-xs font-black text-red-600 text-right">{formatter.format(e.monto)}</td>
-                          <td className="p-3 text-right">
-                             <button onClick={()=>deleteEgreso(e.id)} className="text-red-300 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
-                          </td>
-                        </tr>
-                     ))}
-                     {egresosHoy.length === 0 && (
-                       <tr><td colSpan={4} className="p-6 text-center text-[10px] font-bold uppercase text-slate-400">Sin egresos hoy</td></tr>
-                     )}
-                   </tbody>
-                 </table>
-               </div>
-            </div>
+                <div className="p-0 overflow-y-auto max-h-96">
+                  <table className="w-full text-left bg-white">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-100">
+                       <tr className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                          <th className="px-4 py-2">Detalle</th>
+                          <th className="px-4 py-2">Método</th>
+                          <th className="px-4 py-2 text-right">Monto</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {cuotasHoy.map(c => (
+                         <tr key={`c-${c.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'Desconocida'}</span>
+                              <span className="block text-[10px] font-bold text-purple-600 uppercase tracking-widest mt-0.5 bg-purple-50 inline-block px-1.5 rounded">Cuota Mes {c.mes}</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(c) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{c.metodo_pago}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(c.monto)}</td>
+                         </tr>
+                      ))}
+                      {otrosHoy.map(o => (
+                         <tr key={`o-${o.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{o.concepto}</span>
+                              <span className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest mt-0.5 bg-orange-50 inline-block px-1.5 rounded">Otros Ingresos</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(o) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{o.metodo_pago || o.metodo || 'efectivo'}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(o.monto)}</td>
+                         </tr>
+                      ))}
+                      {merchHoy.map(m => (
+                         <tr key={`m-${m.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">
+                                {m.tipo === 'merch' 
+                                  ? `${m.concepto} ${m.talle ? `(Talle ${m.talle})` : ''} - ${m.alumna_nombre}` 
+                                  : `${m.nombre_producto} (x${m.cantidad})`}
+                              </span>
+                              <span className="block text-[10px] font-bold text-teal-600 uppercase tracking-widest mt-0.5 bg-teal-50 inline-block px-1.5 rounded">
+                                {m.tipo === 'merch' ? 'Indumentaria' : 'Kiosko'}
+                              </span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(m) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{m.metodo_pago || m.metodo || 'efectivo'}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
+                         </tr>
+                      ))}
+                      {licenciasHoy.map(l => (
+                         <tr key={`l-${l.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{l.alumna_nombre}</span>
+                              <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5 bg-indigo-50 inline-block px-1.5 rounded">Licencia Fed</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(l) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{l.metodo}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(l.monto)}</td>
+                         </tr>
+                      ))}
+                      {inscripcionesFedHoy.map(i => (
+                         <tr key={`i-${i.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{i.alumna_nombre}</span>
+                              <span className="block text-[10px] font-bold text-sky-600 uppercase tracking-widest mt-0.5 bg-sky-50 inline-block px-1.5 rounded">Inscripción Fed</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(i) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{i.metodo}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(i.monto)}</td>
+                         </tr>
+                      ))}
+                      {matriculasHoy.map(m => (
+                         <tr key={`mat-${m.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{m.alumna_nombre}</span>
+                              <span className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest mt-0.5 bg-pink-50 inline-block px-1.5 rounded">Matrícula Anual</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(m) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{m.metodo}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
+                         </tr>
+                      ))}
+                      {segurosHoy.map(s => (
+                         <tr key={`seg-${s.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{s.alumna_nombre}</span>
+                              <span className="block text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-0.5 bg-cyan-50 inline-block px-1.5 rounded">Seguro</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(s) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{s.metodo}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(s.monto)}</td>
+                         </tr>
+                      ))}
+                      {torneosPagosHoy.map(t => (
+                         <tr key={`tor-${t.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{t.alumna_nombre}</span>
+                              <span className="block text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-0.5 bg-amber-50 inline-block px-1.5 rounded">Torneo ({t.categoria})</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(t) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{t.metodo}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(t.monto)}</td>
+                         </tr>
+                      ))}
+                      {allDayItems.length === 0 && (
+                        <tr><td colSpan={3} className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-400">Sin ingresos hoy</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+             </div>
+
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                 <div className="p-4 border-b border-slate-100 bg-red-50/50 flex justify-between items-center">
+                   <h3 className="text-xs font-black uppercase tracking-tight text-red-700">Detalle Salidas de Hoy</h3>
+                   <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">{egresosHoy.length} Mvts</span>
+                 </div>
+                <div className="p-0 overflow-y-auto max-h-96">
+                  <table className="w-full text-left bg-white">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-100">
+                       <tr className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                          <th className="px-4 py-2">Detalle</th>
+                          <th className="px-4 py-2">Método</th>
+                          <th className="px-4 py-2 text-right">Monto</th>
+                          <th className="px-4 py-2 text-right w-12"></th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {egresosHoy.map(e => (
+                         <tr key={`e-${e.id}`} className="hover:bg-slate-50 transition-colors">
+                           <td className="px-4 py-3">
+                              <span className="block text-xs font-black text-slate-700">{e.concepto}</span>
+                              <span className="block text-[10px] font-bold text-red-600 uppercase tracking-widest mt-0.5 bg-red-50 inline-block px-1.5 rounded">Gasto / Salida</span>
+                           </td>
+                           <td className="px-4 py-3">
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${e.metodo === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{e.metodo}</span>
+                           </td>
+                           <td className="px-4 py-3 text-sm font-black text-red-600 text-right">-{formatter.format(e.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteEgreso(e.id)} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
+                         </tr>
+                      ))}
+                      {egresosHoy.length === 0 && (
+                        <tr><td colSpan={4} className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-400">Sin egresos hoy</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+             </div>
           </div>
 
           <div className="pt-6 border-t border-slate-200 mt-6">

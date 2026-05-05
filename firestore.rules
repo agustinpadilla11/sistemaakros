@@ -217,6 +217,9 @@ service cloud.firestore {
     match /cajas/{docId} {
       allow read, write: if isAdmin();
     }
+    match /arqueos/{docId} {
+      allow read, write: if isAdmin();
+    }
 
     match /otros_costos/{costoId} {
       allow get: if isSignedIn() && (isAdmin() || isPadreLinked(existing().alumna_id));

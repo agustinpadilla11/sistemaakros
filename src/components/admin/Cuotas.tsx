@@ -167,7 +167,6 @@ export default function Cuotas() {
         });
       }
       alert('Pago registrado correctamente.');
-      setIsCobrarOpen(false);
       setSearchTerm('');
       setCobrarForm({
         alumna_id: '',

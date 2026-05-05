@@ -424,6 +424,8 @@ export function useCajaDiaria() {
   const totalEgresosGralHoy = sumMonto(egresosHoy);
 
   const cajaFinalEfvo = comienzoCaja + totalIngEfvoHoy - sumMonto(egresosHoy.filter(isEfectivo));
+  const cajaFinalDebito = ingDebitoHoy - sumMonto(egresosHoy.filter(isDebito));
+  const cajaFinalTransf = ingTransfHoy - sumMonto(egresosHoy.filter(isTransf));
   const totalFinalTodo = comienzoCaja + totalIngresosGralHoy - totalEgresosGralHoy;
 
   // ---------- MONTHLY CALCULATIONS ----------
@@ -435,6 +437,53 @@ export function useCajaDiaria() {
   const totTransfMes = sumMonto(allMonthItems.filter(isTransf));
   const totEgresosMes = sumMonto(egresos);
   const totFinalMes = (comienzoCaja + sumMonto(allMonthItems)) - totEgresosMes;
+
+  // ---------- ADMINISTRATIVE RESET ----------
+  const resetDailyData = async () => {
+    if (!window.confirm('¿Estás seguro de que deseas ELIMINAR TODOS los movimientos de caja de hoy? Esto no se puede deshacer.')) {
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      const deletePromises: Promise<void>[] = [];
+      
+      const allItemsToDelete = [
+        ...cuotasHoy.map(i => ({ id: i.id, collection: 'cuotas' })),
+        ...otrosHoy.map(i => ({ id: i.id, collection: 'otros_costos' })),
+        ...merchHoy.map(i => ({ id: i.id, collection: 'ventas_merch' })),
+        ...licenciasHoy.map(i => ({ id: i.id, collection: 'federacion_licencias' })),
+        ...inscripcionesFedHoy.map(i => ({ id: i.id, collection: 'federacion_inscripciones' })),
+        ...matriculasHoy.map(i => ({ id: i.id, collection: 'matriculas' })),
+        ...segurosHoy.map(i => ({ id: i.id, collection: 'seguros' })),
+        ...torneosPagosHoy.map(i => ({ id: i.id, collection: 'torneos_pagos' })),
+        ...egresosHoy.map(i => ({ id: i.id, collection: 'egresos' })),
+      ];
+
+      const dateStr = currentDate.toISOString().split('T')[0];
+
+      for (const item of allItemsToDelete) {
+        if (item.id) {
+          deletePromises.push(deleteDoc(doc(db, item.collection, item.id)));
+        }
+      }
+
+      await Promise.all(deletePromises);
+      
+      if (arqueoData) {
+        await deleteDoc(doc(db, 'arqueos', dateStr));
+        setArqueoData(null);
+      }
+
+      await loadData();
+      alert('¡Los datos del día de hoy han sido restablecidos a cero!');
+    } catch (err) {
+      console.error('Error resetting daily data:', err);
+      alert('Hubo un error al intentar borrar los datos de hoy.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // ---------- EXCEL EXPORT ----------
   const exportToExcel = () => {
@@ -527,12 +576,13 @@ export function useCajaDiaria() {
     // Daily calcs
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy,
+    allDayItems, allMonthItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,
     totalIngresosGralHoy, totalEgresosGralHoy,
-    cajaFinalEfvo, totalFinalTodo,
+    cajaFinalEfvo, cajaFinalDebito, cajaFinalTransf, totalFinalTodo,
     // Monthly calcs
     totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes,
     // Utils
-    formatter, exportToExcel, MESES,
+    formatter, exportToExcel, MESES, resetDailyData
   };
 }
