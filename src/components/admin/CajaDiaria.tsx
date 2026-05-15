@@ -33,31 +33,31 @@ export default function CajaDiaria() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden gap-6">
         <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => changeDay(-1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><ChevronLeft className="w-4 h-4" /></button>
+        <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-start">
+          <button onClick={() => changeDay(-1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 shrink-0"><ChevronLeft className="w-4 h-4" /></button>
           <div className="text-center">
-            <h1 className="text-lg font-black uppercase tracking-tight text-slate-800">
+            <h1 className="text-base lg:text-lg font-black uppercase tracking-tight text-slate-800">
               {currentDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h1>
             <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{currentDate.getFullYear()}</p>
           </div>
-          <button onClick={() => changeDay(1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={() => changeDay(1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 shrink-0"><ChevronRight className="w-4 h-4" /></button>
         </div>
         
-        <div className="flex gap-3">
-          <button onClick={exportToExcel} className="bg-emerald-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-700 flex items-center gap-2">
-             <Download className="w-3 h-3" /> Exportar Excel
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+          <button onClick={exportToExcel} className="flex-1 lg:flex-none bg-emerald-600 text-white px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-700 flex items-center justify-center gap-2">
+             <Download className="w-3 h-3" /> <span className="whitespace-nowrap">Exportar Excel</span>
           </button>
-          <button onClick={resetDailyData} disabled={isProcessing} className="bg-red-100 text-red-600 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-red-200 flex items-center gap-2 disabled:opacity-50">
-            <Trash2 className="w-3 h-3" /> Limpiar Día
+          <button onClick={resetDailyData} disabled={isProcessing} className="flex-1 lg:flex-none bg-red-100 text-red-600 px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-red-200 flex items-center justify-center gap-2 disabled:opacity-50">
+            <Trash2 className="w-3 h-3" /> <span className="whitespace-nowrap">Limpiar</span>
           </button>
-          <button onClick={() => { setNuevoComienzo(comienzoCaja.toString()); setCajaFormOpen(true); }} className="bg-slate-100 text-slate-600 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 flex items-center gap-2">
-            <Calculator className="w-3 h-3" /> Modificar Comienzo
+          <button onClick={() => { setNuevoComienzo(comienzoCaja.toString()); setCajaFormOpen(true); }} className="flex-1 lg:flex-none bg-slate-100 text-slate-600 px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 flex items-center justify-center gap-2">
+            <Calculator className="w-3 h-3" /> <span className="whitespace-nowrap">Caja Inicial</span>
           </button>
-          <button onClick={() => { setEgresoForm({ concepto: 'RETIRO DE CAJA', monto: '', metodo: 'efectivo' }); setShowEgreso(true); }} className="bg-amber-500 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-amber-600 flex items-center gap-2">
-            <Plus className="w-3 h-3" /> Salida de Caja (Gasto)
+          <button onClick={() => { setEgresoForm({ concepto: 'RETIRO DE CAJA', monto: '', metodo: 'efectivo' }); setShowEgreso(true); }} className="w-full lg:w-auto bg-amber-500 text-white px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-amber-600 flex items-center justify-center gap-2">
+            <Plus className="w-3 h-3" /> <span className="whitespace-nowrap">Salida / Gasto</span>
           </button>
         </div>
       </div>

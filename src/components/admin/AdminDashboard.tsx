@@ -180,14 +180,14 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {/* HEADER WITH REFRESH */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Panel de Control</h1>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Resumen general y alertas del sistema</p>
+          <h1 className="text-xl lg:text-2xl font-black text-slate-800 uppercase tracking-tight">Panel de Control</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Resumen general y alertas del sistema</p>
         </div>
         <button 
           onClick={() => window.location.reload()} 
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
         >
           <Calendar className="w-4 h-4" />
           Actualizar Datos
@@ -229,10 +229,10 @@ export default function AdminDashboard() {
 
       {/* SECCIÓN PENDIENTES - PRIORIDAD ALTA */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center bg-purple-50">
+        <div className="p-4 lg:p-5 border-b border-slate-100 flex items-center bg-purple-50">
           <Users className="w-5 h-5 text-purple-600 mr-2" />
-          <h3 className="font-bold text-sm uppercase tracking-tight text-slate-800">Solicitudes Pendientes de Aprobación</h3>
-          <span className="ml-3 bg-purple-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{pendientesList.length}</span>
+          <h3 className="font-bold text-[10px] lg:text-sm uppercase tracking-tight text-slate-800">Solicitudes Pendientes de Aprobación</h3>
+          <span className="ml-2 lg:ml-3 bg-purple-600 text-white text-[9px] lg:text-[10px] font-black px-2 py-0.5 rounded-full">{pendientesList.length}</span>
         </div>
         <div className="overflow-x-auto">
           {pendientesList.length > 0 ? (
@@ -276,14 +276,16 @@ export default function AdminDashboard() {
       {/* ALERTAS APTOS MEDICOS */}
       {alumnasVencidas.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center bg-amber-50/50">
-              <AlertCircle className="w-5 h-5 text-amber-500 mr-2" />
-              <h3 className="font-bold text-sm uppercase tracking-tight text-slate-800">Alertas: Certificados Médicos</h3>
-              <div className="ml-auto">
+            <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center bg-amber-50/50 gap-3">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-amber-500 mr-2" />
+                <h3 className="font-bold text-[10px] lg:text-sm uppercase tracking-tight text-slate-800">Alertas: Certificados Médicos</h3>
+              </div>
+              <div className="w-full sm:w-auto sm:ml-auto">
                  <button 
                     onClick={handleAutoSendAll}
                     disabled={isSending}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-bold uppercase tracking-widest transition-colors shadow-sm"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[10px] font-bold uppercase tracking-widest transition-colors shadow-sm"
                  >
                     <Mail className="w-4 h-4" />
                     {isSending ? 'Enviando Avisos...' : 'Avisar Certificados'}

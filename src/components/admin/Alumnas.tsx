@@ -60,23 +60,23 @@ export default function Alumnas() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <h1 className="text-sm font-bold uppercase tracking-tight">Gimnastas</h1>
-        <div className="flex gap-3">
-          <Link to="/admin/alumnas/importar-docs" className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-100 transition-colors border border-emerald-200">
-            Importar Documentos
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
+        <h1 className="text-base lg:text-lg font-black uppercase tracking-tight">Gimnastas</h1>
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+          <Link to="/admin/alumnas/importar-docs" className="flex-1 lg:flex-none text-center bg-emerald-50 text-emerald-700 px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-100 transition-colors border border-emerald-200 whitespace-nowrap">
+            Importar Docs
           </Link>
-          <Link to="/admin/alumnas/importar" className="bg-slate-100 text-slate-600 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 transition-colors">
+          <Link to="/admin/alumnas/importar" className="flex-1 lg:flex-none text-center bg-slate-100 text-slate-600 px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 transition-colors whitespace-nowrap">
             Importar Excel
           </Link>
-          <Link to="/admin/alumnas/nueva" className="bg-purple-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors">
-            Nueva Gimnasta
+          <Link to="/admin/alumnas/nueva" className="flex-1 lg:flex-none text-center bg-purple-600 text-white px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors whitespace-nowrap">
+            Nueva
           </Link>
         </div>
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-4">
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
@@ -84,15 +84,15 @@ export default function Alumnas() {
               placeholder="Buscar por nombre o DNI..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 uppercase"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-full border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50 uppercase"
             />
           </div>
-          <div className="w-64 relative">
+          <div className="w-full sm:w-64 relative">
             <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <select 
               value={filterEstado}
               onChange={(e) => setFilterEstado(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-xs font-bold text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 uppercase"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-full border border-slate-200 text-xs font-bold text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 uppercase"
             >
               <option value="todas">Todos los estados</option>
               <option value="activa">Activas</option>

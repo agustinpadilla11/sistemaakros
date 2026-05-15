@@ -278,34 +278,34 @@ export default function Cuotas() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <h1 className="text-sm font-bold uppercase tracking-tight">Estado de Cuotas</h1>
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
+        <h1 className="text-base lg:text-lg font-black uppercase tracking-tight">Estado de Cuotas</h1>
+        <div className="flex flex-wrap items-center gap-2 lg:gap-4 w-full lg:w-auto">
           <input type="file" accept=".csv, .xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 bg-slate-100 text-slate-600 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 transition-colors"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-600 px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-slate-200 transition-colors"
           >
-            <Upload className="w-3 h-3" /> Importar Ene-Abr
+            <Upload className="w-3 h-3" /> <span className="whitespace-nowrap">Importar Ene-Abr</span>
           </button>
 
           <button 
             onClick={handleExportExcel}
-            className="flex items-center gap-2 bg-green-100 text-green-700 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-green-200 transition-colors"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-green-100 text-green-700 px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-green-200 transition-colors"
           >
-            <Download className="w-3 h-3" /> Exportar Excel
+            <Download className="w-3 h-3" /> <span className="whitespace-nowrap">Exportar Excel</span>
           </button>
           
           <button 
             onClick={() => setIsCobrarOpen(true)}
-            className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-purple-600 text-white px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors"
           >
-            <Plus className="w-3 h-3" /> Cobrar
+            <Plus className="w-3 h-3" /> <span className="whitespace-nowrap">Cobrar</span>
           </button>
 
-          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-200">
+          <div className="flex items-center gap-2 w-full lg:w-auto pt-2 lg:pt-0 lg:ml-4 lg:pl-4 lg:border-l border-slate-200">
             <Filter className="w-4 h-4 text-slate-400" />
-            <select value={yearFil} onChange={e => setYearFil(Number(e.target.value))} className="bg-slate-100 border border-slate-200 rounded p-2 focus:ring-purple-500 focus:border-purple-500 text-xs font-bold uppercase outline-none">
+            <select value={yearFil} onChange={e => setYearFil(Number(e.target.value))} className="flex-1 lg:flex-none bg-slate-100 border border-slate-200 rounded p-2 focus:ring-purple-500 focus:border-purple-500 text-[10px] font-bold uppercase outline-none">
               <option value={2024}>2024</option>
               <option value={2025}>2025</option>
               <option value={2026}>2026</option>
@@ -316,9 +316,9 @@ export default function Cuotas() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-4">
-          <h3 className="text-sm font-bold uppercase tracking-tight shrink-0">Pagos del Año</h3>
-          <div className="flex-1 max-w-sm relative">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h3 className="text-[10px] lg:text-sm font-bold uppercase tracking-tight shrink-0">Pagos del Año</h3>
+          <div className="w-full sm:max-w-sm relative">
              <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
              <input 
                type="text" 

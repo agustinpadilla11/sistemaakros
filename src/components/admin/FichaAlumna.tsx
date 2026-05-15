@@ -231,30 +231,30 @@ export default function FichaAlumna() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <h1 className="text-sm font-bold uppercase tracking-tight">{isNew ? 'Nueva Gimnasta' : formData.nombre_completo || 'Ficha Gimnasta'}</h1>
-        <Link to="/admin/alumnas" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-purple-600 underline">Volver</Link>
+      <div className="flex justify-between items-center bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h1 className="text-base lg:text-lg font-black uppercase tracking-tight">{isNew ? 'Nueva Gimnasta' : formData.nombre_completo || 'Ficha Gimnasta'}</h1>
+        <Link to="/admin/alumnas" className="text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-purple-600 underline whitespace-nowrap">Volver al Listado</Link>
       </div>
 
       {!isNew && (
-        <div className="flex bg-slate-200/50 p-1 rounded-lg gap-1 border border-slate-200 w-fit">
+        <div className="flex bg-slate-200/50 p-1 rounded-lg gap-1 border border-slate-200 w-full lg:w-fit overflow-x-auto scrollbar-hide">
           <button 
             onClick={() => setActiveTab('info')}
-            className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 lg:flex-none px-4 lg:px-6 py-2.5 rounded-md text-[9px] lg:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'info' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Información General
+            Información
           </button>
           <button 
             onClick={() => setActiveTab('pagos')}
-            className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'pagos' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 lg:flex-none px-4 lg:px-6 py-2.5 rounded-md text-[9px] lg:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'pagos' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Historial de Pagos
+            Pagos
           </button>
           <button 
             onClick={() => setActiveTab('grupos')}
-            className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'grupos' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 lg:flex-none px-4 lg:px-6 py-2.5 rounded-md text-[9px] lg:text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'grupos' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Grupo / Historial
+            Grupo
           </button>
         </div>
       )}
@@ -262,26 +262,26 @@ export default function FichaAlumna() {
       {activeTab === 'info' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Nombre Completo</label>
+              <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Nombre Completo</label>
               <input type="text" required value={formData.nombre_completo} onChange={e => setFormData({...formData, nombre_completo: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">DNI</label>
+              <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">DNI</label>
               <input type="text" required value={formData.dni} onChange={e => setFormData({...formData, dni: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Fecha de Nacimiento</label>
+              <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Fecha de Nacimiento</label>
               <input type="date" required value={formData.fecha_nacimiento} onChange={e => setFormData({...formData, fecha_nacimiento: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none uppercase text-slate-500" />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Celular Gimnasta</label>
+              <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Celular Gimnasta</label>
               <input type="tel" value={formData.celular_gimnasta} onChange={e => setFormData({...formData, celular_gimnasta: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Grupo</label>
+              <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Grupo</label>
               <select value={formData.grupo_id} onChange={e => setFormData({...formData, grupo_id: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none uppercase text-slate-600">
                 <option value="">Seleccionar Grupo...</option>
                 {grupos.map(g => (
@@ -290,7 +290,7 @@ export default function FichaAlumna() {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Estado</label>
+              <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Estado</label>
               <select value={formData.estado} onChange={e => setFormData({...formData, estado: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none uppercase text-slate-600">
                 <option value="activa">Activa</option>
                 <option value="inactiva">Inactiva</option>
@@ -298,41 +298,41 @@ export default function FichaAlumna() {
               </select>
             </div>
             
-            <div className="col-span-2 mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
+            <div className="md:col-span-2 mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                 <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Padre</label>
+                 <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Padre / Tutor</label>
                  <input type="text" value={formData.nombre_padre} onChange={e => setFormData({...formData, nombre_padre: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none mb-2" placeholder="Nombre" />
                  <input type="text" value={formData.telefono_padre} onChange={e => setFormData({...formData, telefono_padre: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" placeholder="Teléfono" />
               </div>
               <div>
-                 <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Madre</label>
+                 <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Madre / Tutor</label>
                  <input type="text" value={formData.nombre_madre} onChange={e => setFormData({...formData, nombre_madre: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none mb-2" placeholder="Nombre" />
                  <input type="text" value={formData.telefono_madre} onChange={e => setFormData({...formData, telefono_madre: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" placeholder="Teléfono" />
               </div>
             </div>
 
-            <div className="col-span-2 grid grid-cols-3 gap-4">
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Obra Social</label>
+                  <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Obra Social</label>
                   <input type="text" value={formData.obra_social} onChange={e => setFormData({...formData, obra_social: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
                </div>
                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Número Obra Social</label>
+                  <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Número Obra Social</label>
                   <input type="text" value={formData.numero_obra_social} onChange={e => setFormData({...formData, numero_obra_social: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
                </div>
                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Plan OS</label>
+                  <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Plan OS</label>
                   <input type="text" value={formData.plan_obra_social} onChange={e => setFormData({...formData, plan_obra_social: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
                </div>
             </div>
 
-            <div className="col-span-2">
-               <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Antecedentes Médicos</label>
+            <div className="md:col-span-2">
+               <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Antecedentes Médicos</label>
                <textarea value={formData.antecedentes_medicos} onChange={e => setFormData({...formData, antecedentes_medicos: e.target.value})} rows={2} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
             </div>
 
             {/* Documentos */}
-            <div className="col-span-2 pt-4 border-t border-slate-100">
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
                <h3 className="text-xs font-bold uppercase text-slate-500 tracking-widest mb-4">Documentación Adjunta</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {['foto_gimnasta', 'foto_dni_frente', 'foto_dni_dorso', 'certificado_medico'].map((docKey) => {
@@ -389,36 +389,38 @@ export default function FichaAlumna() {
           <div className="p-4 border-b border-slate-100 bg-slate-50">
              <h3 className="text-sm font-bold uppercase tracking-tight">Registro Financiero</h3>
           </div>
-          <table className="w-full text-left bg-white">
-            <thead>
-              <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-white">
-                <th className="py-3 px-6 font-black border-b border-slate-100">Tipo</th>
-                <th className="py-3 px-6 font-black border-b border-slate-100">Detalle</th>
-                <th className="py-3 px-6 font-black border-b border-slate-100">Monto</th>
-                <th className="py-3 px-6 font-black border-b border-slate-100">Estado</th>
-                <th className="py-3 px-6 font-black border-b border-slate-100">Fecha de Pago</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {pagosInfo.length === 0 ? (
-                <tr><td colSpan={5} className="py-8 text-center text-xs font-bold uppercase text-slate-500">No hay pagos registrados.</td></tr>
-              ) : pagosInfo.map(p => (
-                <tr key={p._id} className="hover:bg-slate-50">
-                  <td className="py-3 px-6 text-xs font-bold text-slate-600 uppercase">{p.tipo}</td>
-                  <td className="py-3 px-6 text-xs text-slate-500">{p.detalle}</td>
-                  <td className="py-3 px-6 text-sm font-black text-purple-700">${p.monto}</td>
-                  <td className="py-3 px-6">
-                    <span className={`inline-flex px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest border ${
-                      p.estado === 'pagado' ? 'bg-emerald-100 border-emerald-200 text-emerald-700' : 'bg-amber-100 border-amber-200 text-amber-700'
-                    }`}>
-                      {p.estado}
-                    </span>
-                  </td>
-                  <td className="py-3 px-6 text-xs text-slate-500">{p.fecha_pago ? p.fecha_pago.toLocaleDateString('es-AR') : '-'}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left bg-white">
+              <thead>
+                <tr className="text-[10px] lg:text-xs uppercase text-slate-400 tracking-wider bg-white">
+                  <th className="py-3 px-4 lg:px-6 font-black border-b border-slate-100 whitespace-nowrap">Tipo</th>
+                  <th className="py-3 px-4 lg:px-6 font-black border-b border-slate-100 whitespace-nowrap">Detalle</th>
+                  <th className="py-3 px-4 lg:px-6 font-black border-b border-slate-100 whitespace-nowrap">Monto</th>
+                  <th className="py-3 px-4 lg:px-6 font-black border-b border-slate-100 whitespace-nowrap">Estado</th>
+                  <th className="py-3 px-4 lg:px-6 font-black border-b border-slate-100 whitespace-nowrap">Fecha Pago</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pagosInfo.length === 0 ? (
+                  <tr><td colSpan={5} className="py-8 text-center text-xs font-bold uppercase text-slate-500">No hay pagos registrados.</td></tr>
+                ) : pagosInfo.map(p => (
+                  <tr key={p._id} className="hover:bg-slate-50">
+                    <td className="py-3 px-4 lg:px-6 text-[10px] lg:text-xs font-bold text-slate-600 uppercase">{p.tipo}</td>
+                    <td className="py-3 px-4 lg:px-6 text-[10px] lg:text-xs text-slate-500">{p.detalle}</td>
+                    <td className="py-3 px-4 lg:px-6 text-xs lg:text-sm font-black text-purple-700">${p.monto}</td>
+                    <td className="py-3 px-4 lg:px-6">
+                      <span className={`inline-flex px-2 py-1 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-widest border ${
+                        p.estado === 'pagado' ? 'bg-emerald-100 border-emerald-200 text-emerald-700' : 'bg-amber-100 border-amber-200 text-amber-700'
+                      }`}>
+                        {p.estado}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 lg:px-6 text-[10px] lg:text-xs text-slate-500">{p.fecha_pago ? p.fecha_pago.toLocaleDateString('es-AR') : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
