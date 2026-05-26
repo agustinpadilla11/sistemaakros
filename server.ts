@@ -5,6 +5,7 @@ import path from "path";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -25,6 +26,63 @@ async function startServer() {
   };
   const firebaseApp = initializeApp(firebaseConfig);
   const db = getFirestore(firebaseApp, process.env.VITE_FIREBASE_DATABASE_ID);
+
+  // Initialize Supabase (Server-side for keeping it alive)
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  let supabase: any = null;
+
+  if (supabaseUrl && supabaseAnonKey) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    const pingSupabase = async () => {
+      try {
+        console.log("[Supabase Keep-Alive] Intentando conectar a Supabase...");
+        const { data, error } = await supabase.storage.listBuckets();
+        if (error) {
+          console.error("[Supabase Keep-Alive] Error al pingear Supabase:", error.message);
+        } else {
+          console.log(`[Supabase Keep-Alive] Ping exitoso. Buckets encontrados: ${data?.length || 0}`);
+        }
+      } catch (err) {
+        console.error("[Supabase Keep-Alive] Error inesperado:", err);
+      }
+    };
+
+    // Ping on server start
+    pingSupabase();
+
+    // Ping every 24 hours (86400000 ms)
+    setInterval(pingSupabase, 24 * 60 * 60 * 1000);
+  } else {
+    console.warn("[Supabase Keep-Alive] No se encontraron credenciales de Supabase. El auto-ping no se iniciará.");
+  }
+
+  // API Route for health check and manual keep-alive trigger
+  app.get("/api/health", async (req, res) => {
+    try {
+      let supabaseStatus = "not_configured";
+      if (supabase) {
+        const { data, error } = await supabase.storage.listBuckets();
+        if (error) {
+          supabaseStatus = `error: ${error.message}`;
+        } else {
+          supabaseStatus = `ok (found ${data?.length || 0} buckets)`;
+        }
+      }
+      res.json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        supabase: supabaseStatus
+      });
+    } catch (error: any) {
+      console.error("Error in /api/health", error);
+      res.status(500).json({
+        status: "error",
+        message: error.message || error
+      });
+    }
+  });
 
   // API Route to send late payment reminders
   app.post("/api/send-late-payment-reminders", async (req, res) => {
