@@ -305,7 +305,7 @@ export default function CajaDiaria() {
              </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Efectivo</p>
@@ -319,27 +319,6 @@ export default function CajaDiaria() {
             <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg border border-slate-700 flex flex-col justify-center relative overflow-hidden">
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Total Consolidado</p>
                <p className="text-3xl font-black text-white relative z-10">{formatter.format(totalFinalTodo)}</p>
-            </div>
-            
-            <div className={`p-4 rounded-xl shadow-md flex justify-between items-center border-2 ${arqueoData ? 'bg-emerald-50 border-emerald-500' : 'bg-white border-dashed border-slate-300'}`}>
-               <div className="w-full">
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">ARQUEO DE CIERRE</p>
-                  {arqueoData ? (
-                    <div className="flex flex-col gap-1 mt-2">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[10px] text-slate-500 font-bold uppercase">Real en caja:</p>
-                        <p className="text-sm font-black text-slate-800">{formatter.format(arqueoData.real)}</p>
-                      </div>
-                      <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase text-center w-full mt-1 ${arqueoData.diferencia === 0 ? 'bg-emerald-200 text-emerald-800' : 'bg-red-100 text-red-700'}`}>
-                        {arqueoData.diferencia === 0 ? 'Caja Cerrada OK' : `Dif: ${formatter.format(arqueoData.diferencia)}`}
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => setShowArqueo(true)} className="mt-3 w-full bg-purple-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center justify-center gap-2">
-                       <CheckCircle2 className="w-3 h-3" /> Realizar Arqueo
-                    </button>
-                  )}
-               </div>
             </div>
           </div>
 
