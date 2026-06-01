@@ -34,7 +34,7 @@ export default function Torneos() {
     setLoading(true);
     try {
       const aSnap = await getDocs(collection(db, 'alumnas'));
-      setAlumnas(aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (a.nombre_completo || '').localeCompare(b.nombre_completo || '')));
+      setAlumnas(aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(a => a.estado !== 'inactiva').sort((a: any, b: any) => (a.nombre_completo || '').localeCompare(b.nombre_completo || '')));
 
       const tSnap = await getDocs(collection(db, 'torneos_lista'));
       const tList = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));

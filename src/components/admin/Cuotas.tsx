@@ -345,7 +345,7 @@ export default function Cuotas() {
               {loading ? (
                 <tr><td colSpan={13} className="py-8 text-center text-xs font-bold uppercase text-slate-500">Cargando datos...</td></tr>
               ) : alumnas
-                  .filter(a => a.nombre_completo?.toLowerCase().includes(searchTermGlobal.toLowerCase()))
+                  .filter(a => a.estado !== 'inactiva' && a.nombre_completo?.toLowerCase().includes(searchTermGlobal.toLowerCase()))
                   .sort((a, b) => (a.nombre_completo || '').localeCompare(b.nombre_completo || ''))
                   .map(alu => {
                 const aluCuotas = cuotas[alu.id] || [];
@@ -469,10 +469,10 @@ export default function Cuotas() {
                   placeholder="Ej: Pérez María..."
                   className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded outline-none uppercase text-slate-600 focus:ring-purple-500 focus:border-purple-500"
                 />
-                {searchTerm.length > 2 && !cobrarForm.alumna_id && (
+                 {searchTerm.length > 2 && !cobrarForm.alumna_id && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded shadow-2xl max-h-48 overflow-y-auto">
                     {alumnas
-                      .filter(a => a.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .filter(a => a.estado !== 'inactiva' && a.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()))
                       .map(a => (
                         <button
                           key={a.id}

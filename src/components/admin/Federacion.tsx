@@ -46,7 +46,7 @@ export default function Federacion() {
     setLoading(true);
     try {
       const aSnap = await getDocs(collection(db, 'alumnas'));
-      setAlumnas(aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => (a.nombre_completo || '').localeCompare(b.nombre_completo || '')));
+      setAlumnas(aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(a => a.estado !== 'inactiva').sort((a: any, b: any) => (a.nombre_completo || '').localeCompare(b.nombre_completo || '')));
 
       const collectionName = activeTab === 'licencias' ? 'federacion_licencias' : 'federacion_inscripciones';
       const dSnap = await getDocs(collection(db, collectionName));

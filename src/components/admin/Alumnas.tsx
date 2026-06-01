@@ -104,8 +104,34 @@ export default function Alumnas() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
            <h3 className="text-sm font-bold uppercase tracking-tight">Listado</h3>
+           <div className="flex bg-slate-200/50 p-1 rounded-lg gap-1 border border-slate-200 w-full sm:w-auto overflow-x-auto">
+             <button 
+               onClick={() => setFilterEstado('todas')}
+               className={`px-3 py-1.5 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${filterEstado === 'todas' ? 'bg-white shadow-sm text-purple-700 font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               Todas ({alumnas.length})
+             </button>
+             <button 
+               onClick={() => setFilterEstado('activa')}
+               className={`px-3 py-1.5 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${filterEstado === 'activa' ? 'bg-emerald-600 text-white font-extrabold shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               Activas ({alumnas.filter(a => a.estado === 'activa').length})
+             </button>
+             <button 
+               onClick={() => setFilterEstado('inactiva')}
+               className={`px-3 py-1.5 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${filterEstado === 'inactiva' ? 'bg-red-600 text-white font-extrabold shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               Bajas ({alumnas.filter(a => a.estado === 'inactiva').length})
+             </button>
+             <button 
+               onClick={() => setFilterEstado('pendiente_aprobacion')}
+               className={`px-3 py-1.5 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${filterEstado === 'pendiente_aprobacion' ? 'bg-amber-500 text-white font-extrabold shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               Pendientes ({alumnas.filter(a => a.estado === 'pendiente_aprobacion').length})
+             </button>
+           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -135,35 +161,40 @@ export default function Alumnas() {
                         alumna.estado === 'inactiva' ? 'bg-red-100 text-red-700' :
                         'bg-amber-100 text-amber-700'
                       }`}>
-                        {alumna.estado}
+                        {alumna.estado === 'inactiva' ? 'Baja' : alumna.estado === 'pendiente_aprobacion' ? 'Pendiente' : 'Activa'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       {alumna.importada ? <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded">Sí</span> : '-'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-3">
+                      <div className="flex justify-end gap-3 items-center">
                         {statusConfirmId?.id === alumna.id ? (
                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-slate-500 font-bold uppercase mr-1">¿Cambiar estado a {statusConfirmId.nuevoEstado}?</span>
+                              <span className="text-[10px] text-slate-500 font-bold uppercase mr-1">¿Cambiar estado a {statusConfirmId.nuevoEstado === 'inactiva' ? 'baja' : statusConfirmId.nuevoEstado === 'activa' ? 'activa' : statusConfirmId.nuevoEstado}?</span>
                               <button onClick={() => handleEstadoChange(alumna.id, statusConfirmId.nuevoEstado)} className="text-[10px] bg-slate-800 text-white font-bold uppercase rounded px-2 py-1">Sí</button>
                               <button onClick={() => setStatusConfirmId(null)} className="text-[10px] bg-slate-200 text-slate-600 font-bold uppercase rounded px-2 py-1">No</button>
                            </div>
                         ) : (
-                          <>
-                            {alumna.estado === 'pendiente_aprobacion' && (
-                              <button onClick={() => setStatusConfirmId({id: alumna.id, nuevoEstado: 'activa'})} className="text-[10px] font-bold text-emerald-600 uppercase underline">
-                                Aprobar
-                              </button>
-                            )}
-                            {alumna.estado === 'activa' && (
-                              <button onClick={() => setStatusConfirmId({id: alumna.id, nuevoEstado: 'inactiva'})} className="text-[10px] font-bold text-slate-600 uppercase underline">
-                                Desactivar
-                              </button>
-                            )}
-                          </>
+                           <>
+                             {alumna.estado === 'pendiente_aprobacion' && (
+                               <button onClick={() => setStatusConfirmId({id: alumna.id, nuevoEstado: 'activa'})} className="text-[10px] font-bold text-emerald-600 uppercase underline hover:text-emerald-800">
+                                 Aprobar
+                               </button>
+                             )}
+                             {alumna.estado === 'activa' && (
+                               <button onClick={() => setStatusConfirmId({id: alumna.id, nuevoEstado: 'inactiva'})} className="text-[10px] font-bold text-red-600 uppercase underline hover:text-red-800">
+                                 Dar de Baja
+                               </button>
+                             )}
+                             {alumna.estado === 'inactiva' && (
+                               <button onClick={() => setStatusConfirmId({id: alumna.id, nuevoEstado: 'activa'})} className="text-[10px] font-bold text-emerald-600 uppercase underline hover:text-emerald-800">
+                                 Dar de Alta
+                               </button>
+                             )}
+                           </>
                         )}
-                        <Link to={`/admin/alumnas/${alumna.id}`} className="text-[10px] font-bold text-purple-600 uppercase underline">
+                        <Link to={`/admin/alumnas/${alumna.id}`} className="text-[10px] font-bold text-purple-600 uppercase underline hover:text-purple-800">
                           Ver Perfil
                         </Link>
                         {deleteConfirmId === alumna.id ? (
@@ -173,7 +204,7 @@ export default function Alumnas() {
                             <button onClick={() => setDeleteConfirmId(null)} className="text-[10px] bg-slate-200 text-slate-600 font-bold uppercase rounded px-2 py-1">No</button>
                           </div>
                         ) : (
-                          <button onClick={() => setDeleteConfirmId(alumna.id)} className="text-[10px] font-bold text-red-600 uppercase underline">
+                          <button onClick={() => setDeleteConfirmId(alumna.id)} className="text-[10px] font-bold text-red-600 uppercase underline hover:text-red-800">
                             Eliminar
                           </button>
                         )}

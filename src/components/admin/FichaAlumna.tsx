@@ -293,7 +293,7 @@ export default function FichaAlumna() {
               <label className="block text-[9px] lg:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Estado</label>
               <select value={formData.estado} onChange={e => setFormData({...formData, estado: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none uppercase text-slate-600">
                 <option value="activa">Activa</option>
-                <option value="inactiva">Inactiva</option>
+                <option value="inactiva">Baja</option>
                 <option value="pendiente_aprobacion">Pendiente</option>
               </select>
             </div>

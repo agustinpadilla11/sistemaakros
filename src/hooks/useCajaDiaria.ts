@@ -137,7 +137,7 @@ export function useCajaDiaria() {
       setTorneosPagos(filterByMonth(torSnap.docs.map(d => ({id: d.id, ...d.data()}))));
 
       const alSnap = await getDocs(collection(db, 'alumnas'));
-      setAlumnas(alSnap.docs.map(d => ({id: d.id, ...d.data()} as any)));
+      setAlumnas(alSnap.docs.map(d => ({id: d.id, ...d.data()} as any)).filter((a: any) => a.estado !== 'inactiva'));
       const prSnap = await getDocs(collection(db, 'productos'));
       setProductos(prSnap.docs.map(d => ({id: d.id, ...d.data()} as any)).filter((p: any) => p.stock > 0));
     } catch (err) {

@@ -129,7 +129,7 @@ export default function Seguro() {
   );
 
   const filteredAlumnas = alumnas.filter(a => 
-    (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase())
+    a.estado !== 'inactiva' && (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
