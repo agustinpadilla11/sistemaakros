@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Search, Filter, Plus, FileSpreadsheet, Edit, Trash2, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -32,6 +32,31 @@ export default function Alumnas() {
   const handleEstadoChange = async (id: string, nuevoEstado: string) => {
     try {
       await updateDoc(doc(db, 'alumnas', id), { estado: nuevoEstado });
+      
+      if (nuevoEstado === 'inactiva') {
+        const alumna = alumnas.find(a => a.id === id);
+        if (alumna) {
+          let grupoNombre = 'SIN GRUPO';
+          let grupoHorario = '';
+          if (alumna.grupo_id) {
+             const gSnap = await getDocs(collection(db, 'grupos'));
+             const grupoDoc = gSnap.docs.find(d => d.id === alumna.grupo_id);
+             if (grupoDoc) {
+                const gData = grupoDoc.data();
+                grupoNombre = gData.nombre || 'SIN GRUPO';
+                grupoHorario = gData.horario || '';
+             }
+          }
+          await setDoc(doc(collection(db, 'bajas')), {
+            alumna_nombre: alumna.nombre_completo,
+            alumna_dni: alumna.dni || '',
+            grupo_nombre: grupoNombre,
+            grupo_horario: grupoHorario,
+            fecha: new Date()
+          });
+        }
+      }
+      
       setStatusConfirmId(null);
       loadAlumnas();
     } catch (err) {

@@ -216,7 +216,32 @@ export default function FichaAlumna() {
         }
         await Promise.all(promises);
       } else {
-        await updateDoc(doc(db, 'alumnas', id as string), dataToSave);
+        const docRef = doc(db, 'alumnas', id as string);
+        const currentSnap = await getDoc(docRef);
+        const currentData = currentSnap.data();
+
+        await updateDoc(docRef, dataToSave);
+
+        if (formData.estado === 'inactiva' && currentData?.estado !== 'inactiva') {
+          let grupoNombre = 'SIN GRUPO';
+          let grupoHorario = '';
+          if (formData.grupo_id) {
+             const gSnap = await getDocs(collection(db, 'grupos'));
+             const grupoDoc = gSnap.docs.find(d => d.id === formData.grupo_id);
+             if (grupoDoc) {
+                const gData = grupoDoc.data();
+                grupoNombre = gData.nombre || 'SIN GRUPO';
+                grupoHorario = gData.horario || '';
+             }
+          }
+          await setDoc(doc(collection(db, 'bajas')), {
+            alumna_nombre: formData.nombre_completo,
+            alumna_dni: formData.dni || '',
+            grupo_nombre: grupoNombre,
+            grupo_horario: grupoHorario,
+            fecha: new Date()
+          });
+        }
       }
       navigate('/admin/alumnas');
     } catch (err) {
