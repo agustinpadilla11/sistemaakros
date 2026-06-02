@@ -14,7 +14,7 @@ const isEfectivo = (item: Record<string, any>) => getMetodo(item) === 'efectivo'
 const isDebito = (item: Record<string, any>) => getMetodo(item) === 'debito';
 const isTransf = (item: Record<string, any>) => {
   const m = getMetodo(item);
-  return m === 'transferencia';
+  return m === 'transferencia' || m === 'mp' || m === 'mercado pago' || m === 'mercado_pago';
 };
 
 const sumMonto = (items: Record<string, any>[]) => items.reduce((a, b) => a + (b.monto || 0), 0);
@@ -377,6 +377,23 @@ export function useCajaDiaria() {
     }
   };
 
+  const deleteIngreso = async (id: string, collectionName: string, extraData?: { producto_id?: string, cantidad?: number }) => {
+    if (!window.confirm('¿Seguro que deseas eliminar este registro de ingreso?')) return;
+    try {
+      if (collectionName === 'ventas_merch' && extraData?.producto_id && extraData?.cantidad) {
+        await updateDoc(doc(db, 'productos', extraData.producto_id), {
+          stock: increment(extraData.cantidad)
+        });
+      }
+      await deleteDoc(doc(db, collectionName, id));
+      await loadData();
+      alert('Registro de ingreso eliminado correctamente.');
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar ingreso: ' + (err instanceof Error ? err.message : 'Error desconocido'));
+    }
+  };
+
   const handleArqueo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -572,7 +589,7 @@ export function useCajaDiaria() {
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
     showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, arqueoData, handleArqueo,
-    deleteEgreso,
+    deleteEgreso, deleteIngreso,
     // Daily calcs
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy,

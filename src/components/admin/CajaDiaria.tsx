@@ -20,7 +20,7 @@ export default function CajaDiaria() {
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
     showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, arqueoData, handleArqueo,
-    deleteEgreso,
+    deleteEgreso, deleteIngreso,
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy, allDayItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,
@@ -30,6 +30,14 @@ export default function CajaDiaria() {
   } = caja;
 
   const getMetodo = (item: any) => item.metodo_pago || item.metodo || 'efectivo';
+
+  const getMetodoBadgeStyle = (item: any) => {
+    const m = getMetodo(item).toLowerCase();
+    if (m === 'efectivo') return 'bg-emerald-100 text-emerald-700';
+    if (m === 'debito') return 'bg-blue-100 text-blue-700';
+    if (m === 'transferencia' || m === 'mp' || m === 'mercado pago' || m === 'mercado_pago') return 'bg-purple-100 text-purple-700';
+    return 'bg-slate-100 text-slate-700';
+  };
 
   return (
     <div className="space-y-6">
@@ -286,7 +294,7 @@ export default function CajaDiaria() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Comienzo Caja</span>
                 <span className="text-xl font-black text-slate-700">{formatter.format(comienzoCaja)}</span>
@@ -299,13 +307,17 @@ export default function CajaDiaria() {
                 <span className="text-[10px] uppercase font-bold text-blue-600 tracking-widest">Ingr. Débito</span>
                 <span className="text-xl font-black text-blue-700">{formatter.format(ingDebitoHoy)}</span>
              </div>
-             <div className="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col justify-between col-span-2">
+             <div className="bg-purple-50 p-4 rounded-xl shadow-sm border border-purple-100 flex flex-col justify-between">
+                <span className="text-[10px] uppercase font-bold text-purple-600 tracking-widest">Ingr. Transferencia</span>
+                <span className="text-xl font-black text-purple-700">{formatter.format(ingTransfHoy)}</span>
+             </div>
+             <div className="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col justify-between">
                 <span className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">Se sacó de Caja (Gasto)</span>
                 <span className="text-xl font-black text-amber-700">{formatter.format(totalEgresosGralHoy)}</span>
              </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Efectivo</p>
@@ -315,6 +327,11 @@ export default function CajaDiaria() {
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Débito</p>
                <p className="text-2xl font-black text-blue-400 relative z-10">{formatter.format(cajaFinalDebito)}</p>
+            </div>
+            <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Transferencia</p>
+               <p className="text-2xl font-black text-purple-400 relative z-10">{formatter.format(cajaFinalTransf)}</p>
             </div>
             <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg border border-slate-700 flex flex-col justify-center relative overflow-hidden">
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Total Consolidado</p>
@@ -416,6 +433,7 @@ export default function CajaDiaria() {
                           <th className="px-4 py-2">Detalle</th>
                           <th className="px-4 py-2">Método</th>
                           <th className="px-4 py-2 text-right">Monto</th>
+                          <th className="px-4 py-2 text-right w-12"></th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -426,9 +444,12 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-purple-600 uppercase tracking-widest mt-0.5 bg-purple-50 inline-block px-1.5 rounded">Cuota Mes {c.mes}</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(c) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{c.metodo_pago}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(c)}`}>{c.metodo_pago}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(c.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(c.id, 'cuotas')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {otrosHoy.map(o => (
@@ -438,9 +459,12 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest mt-0.5 bg-orange-50 inline-block px-1.5 rounded">Otros Ingresos</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(o) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{o.metodo_pago || o.metodo || 'efectivo'}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(o)}`}>{o.metodo_pago || o.metodo || 'efectivo'}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(o.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(o.id, 'otros_costos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {merchHoy.map(m => (
@@ -456,9 +480,12 @@ export default function CajaDiaria() {
                               </span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(m) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{m.metodo_pago || m.metodo || 'efectivo'}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo_pago || m.metodo || 'efectivo'}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(m.id, 'ventas_merch', { producto_id: m.producto_id, cantidad: m.cantidad })} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {licenciasHoy.map(l => (
@@ -468,9 +495,12 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5 bg-indigo-50 inline-block px-1.5 rounded">Licencia Fed</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(l) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{l.metodo}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(l)}`}>{l.metodo}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(l.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(l.id, 'federacion_licencias')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {inscripcionesFedHoy.map(i => (
@@ -480,9 +510,12 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-sky-600 uppercase tracking-widest mt-0.5 bg-sky-50 inline-block px-1.5 rounded">Inscripción Fed</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(i) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{i.metodo}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(i)}`}>{i.metodo}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(i.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(i.id, 'federacion_inscripciones')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {matriculasHoy.map(m => (
@@ -492,9 +525,12 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest mt-0.5 bg-pink-50 inline-block px-1.5 rounded">Matrícula Anual</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(m) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{m.metodo}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(m.id, 'matriculas')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {segurosHoy.map(s => (
@@ -504,9 +540,12 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-0.5 bg-cyan-50 inline-block px-1.5 rounded">Seguro</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(s) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{s.metodo}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(s)}`}>{s.metodo}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(s.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(s.id, 'seguros')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {torneosPagosHoy.map(t => (
@@ -516,13 +555,16 @@ export default function CajaDiaria() {
                               <span className="block text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-0.5 bg-amber-50 inline-block px-1.5 rounded">Torneo ({t.categoria})</span>
                            </td>
                            <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodo(t) === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{t.metodo}</span>
+                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(t)}`}>{t.metodo}</span>
                            </td>
                            <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(t.monto)}</td>
+                           <td className="px-4 py-3 text-right">
+                              <button onClick={()=>deleteIngreso(t.id, 'torneos_pagos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           </td>
                          </tr>
                       ))}
                       {allDayItems.length === 0 && (
-                        <tr><td colSpan={3} className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-400">Sin ingresos hoy</td></tr>
+                        <tr><td colSpan={4} className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-400">Sin ingresos hoy</td></tr>
                       )}
                     </tbody>
                   </table>
