@@ -209,7 +209,7 @@ export default function CajaDiaria() {
                     <div>
                       <button 
                         type="submit" 
-                        disabled={isProcessing || !merchForm.producto_id} 
+                        disabled={isProcessing || !searchMerch || !merchForm.monto} 
                         className="w-full bg-emerald-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm active:scale-95 disabled:opacity-50"
                       >
                          {isProcessing ? 'Procesando...' : 'Vender'}
@@ -437,132 +437,162 @@ export default function CajaDiaria() {
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {cuotasHoy.map(c => (
-                         <tr key={`c-${c.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'Desconocida'}</span>
-                              <span className="block text-[10px] font-bold text-purple-600 uppercase tracking-widest mt-0.5 bg-purple-50 inline-block px-1.5 rounded">Cuota Mes {c.mes}</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(c)}`}>{c.metodo_pago}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(c.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(c.id, 'cuotas')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {otrosHoy.map(o => (
-                         <tr key={`o-${o.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{o.concepto}</span>
-                              <span className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest mt-0.5 bg-orange-50 inline-block px-1.5 rounded">Otros Ingresos</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(o)}`}>{o.metodo_pago || o.metodo || 'efectivo'}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(o.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(o.id, 'otros_costos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {merchHoy.map(m => (
-                         <tr key={`m-${m.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">
-                                {m.tipo === 'merch' 
-                                  ? `${m.concepto} ${m.talle ? `(Talle ${m.talle})` : ''} - ${m.alumna_nombre}` 
-                                  : `${m.nombre_producto} (x${m.cantidad})`}
-                              </span>
-                              <span className="block text-[10px] font-bold text-teal-600 uppercase tracking-widest mt-0.5 bg-teal-50 inline-block px-1.5 rounded">
-                                {m.tipo === 'merch' ? 'Indumentaria' : 'Kiosko'}
-                              </span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo_pago || m.metodo || 'efectivo'}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(m.id, 'ventas_merch', { producto_id: m.producto_id, cantidad: m.cantidad })} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {licenciasHoy.map(l => (
-                         <tr key={`l-${l.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{l.alumna_nombre}</span>
-                              <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5 bg-indigo-50 inline-block px-1.5 rounded">Licencia Fed</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(l)}`}>{l.metodo}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(l.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(l.id, 'federacion_licencias')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {inscripcionesFedHoy.map(i => (
-                         <tr key={`i-${i.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{i.alumna_nombre}</span>
-                              <span className="block text-[10px] font-bold text-sky-600 uppercase tracking-widest mt-0.5 bg-sky-50 inline-block px-1.5 rounded">Inscripción Fed</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(i)}`}>{i.metodo}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(i.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(i.id, 'federacion_inscripciones')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {matriculasHoy.map(m => (
-                         <tr key={`mat-${m.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{m.alumna_nombre}</span>
-                              <span className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest mt-0.5 bg-pink-50 inline-block px-1.5 rounded">Matrícula Anual</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(m.id, 'matriculas')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {segurosHoy.map(s => (
-                         <tr key={`seg-${s.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{s.alumna_nombre}</span>
-                              <span className="block text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-0.5 bg-cyan-50 inline-block px-1.5 rounded">Seguro</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(s)}`}>{s.metodo}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(s.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(s.id, 'seguros')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
-                      {torneosPagosHoy.map(t => (
-                         <tr key={`tor-${t.id}`} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3">
-                              <span className="block text-xs font-black text-slate-700">{t.alumna_nombre}</span>
-                              <span className="block text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-0.5 bg-amber-50 inline-block px-1.5 rounded">Torneo ({t.categoria})</span>
-                           </td>
-                           <td className="px-4 py-3">
-                             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(t)}`}>{t.metodo}</span>
-                           </td>
-                           <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(t.monto)}</td>
-                           <td className="px-4 py-3 text-right">
-                              <button onClick={()=>deleteIngreso(t.id, 'torneos_pagos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                           </td>
-                         </tr>
-                      ))}
+                      {allDayItems.map(item => {
+                        switch (item._type) {
+                          case 'cuota': {
+                            const c = item as any;
+                            return (
+                              <tr key={`c-${c.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'Desconocida'}</span>
+                                   <span className="block text-[10px] font-bold text-purple-600 uppercase tracking-widest mt-0.5 bg-purple-50 inline-block px-1.5 rounded">Cuota Mes {MESES[c.mes - 1]}</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(c)}`}>{c.metodo_pago}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(c.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(c.id, 'cuotas')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'otro': {
+                            const o = item as any;
+                            return (
+                              <tr key={`o-${o.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{o.concepto}</span>
+                                   <span className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest mt-0.5 bg-orange-50 inline-block px-1.5 rounded">Otros Ingresos</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(o)}`}>{o.metodo_pago || o.metodo || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(o.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(o.id, 'otros_costos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'merch': {
+                            const m = item as any;
+                            return (
+                              <tr key={`m-${m.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">
+                                     {m.tipo === 'merch' 
+                                       ? `${m.concepto} ${m.talle ? `(Talle ${m.talle})` : ''} - ${m.alumna_nombre}` 
+                                       : `${m.nombre_producto} (x${m.cantidad})`}
+                                   </span>
+                                   <span className="block text-[10px] font-bold text-teal-600 uppercase tracking-widest mt-0.5 bg-teal-50 inline-block px-1.5 rounded">
+                                     {m.tipo === 'merch' ? 'Indumentaria' : 'Kiosko'}
+                                   </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo_pago || m.metodo || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(m.id, 'ventas_merch', { producto_id: m.producto_id, cantidad: m.cantidad })} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'licencia': {
+                            const l = item as any;
+                            return (
+                              <tr key={`l-${l.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{l.alumna_nombre}</span>
+                                   <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5 bg-indigo-50 inline-block px-1.5 rounded">Licencia Fed</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(l)}`}>{l.metodo || l.metodo_pago || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(l.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(l.id, 'federacion_licencias')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'inscripcion': {
+                            const i = item as any;
+                            return (
+                              <tr key={`i-${i.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{i.alumna_nombre}</span>
+                                   <span className="block text-[10px] font-bold text-sky-600 uppercase tracking-widest mt-0.5 bg-sky-50 inline-block px-1.5 rounded">Inscripción Fed</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(i)}`}>{i.metodo || i.metodo_pago || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(i.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(i.id, 'federacion_inscripciones')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'matricula': {
+                            const m = item as any;
+                            return (
+                              <tr key={`mat-${m.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{m.alumna_nombre}</span>
+                                   <span className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest mt-0.5 bg-pink-50 inline-block px-1.5 rounded">Matrícula Anual</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo || m.metodo_pago || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(m.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(m.id, 'matriculas')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'seguro': {
+                            const s = item as any;
+                            return (
+                              <tr key={`seg-${s.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{s.alumna_nombre}</span>
+                                   <span className="block text-[10px] font-bold text-cyan-600 uppercase tracking-widest mt-0.5 bg-cyan-50 inline-block px-1.5 rounded">Seguro</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(s)}`}>{s.metodo || s.metodo_pago || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(s.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(s.id, 'seguros')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          case 'torneo': {
+                            const t = item as any;
+                            return (
+                              <tr key={`tor-${t.id}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                   <span className="block text-xs font-black text-slate-700">{t.alumna_nombre}</span>
+                                   <span className="block text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-0.5 bg-amber-50 inline-block px-1.5 rounded">Torneo ({t.categoria})</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(t)}`}>{t.metodo || t.metodo_pago || 'efectivo'}</span>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(t.monto)}</td>
+                                <td className="px-4 py-3 text-right">
+                                   <button onClick={()=>deleteIngreso(t.id, 'torneos_pagos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          default:
+                            return null;
+                        }
+                      })}
                       {allDayItems.length === 0 && (
                         <tr><td colSpan={4} className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-400">Sin ingresos hoy</td></tr>
                       )}

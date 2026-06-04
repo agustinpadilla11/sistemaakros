@@ -240,10 +240,10 @@ export function useCajaDiaria() {
   const handlePOSMerch = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    const { producto_id, cantidad, metodo_pago } = merchForm;
+    const { producto_id, cantidad, metodo_pago, monto } = merchForm;
     
-    if (!producto_id) {
-      alert('Por favor, selecciona un producto.');
+    if (!searchMerch) {
+      alert('Por favor, selecciona o escribe un producto.');
       return;
     }
     if (!cantidad || cantidad <= 0) {
@@ -254,22 +254,27 @@ export function useCajaDiaria() {
     setIsProcessing(true);
     try {
       const prod = productos.find(p => p.id === producto_id);
-      if (!prod) throw new Error('Producto no encontrado en el inventario.');
       
-      if (prod.stock < cantidad) {
+      if (prod && prod.stock < cantidad) {
         if (!confirm(`Stock insuficiente (${prod.stock}). ¿Deseas continuar con la venta de todos modos?`)) {
           setIsProcessing(false);
           return;
         }
       }
 
-      const total = Number(merchForm.monto) > 0 ? Number(merchForm.monto) : Number(prod.precio) * cantidad;
+      const total = Number(monto) > 0 ? Number(monto) : (prod ? Number(prod.precio) * cantidad : 0);
+      if (total <= 0) {
+        alert('Por favor, ingresa un monto válido.');
+        setIsProcessing(false);
+        return;
+      }
+
       const ventaRef = doc(collection(db, 'ventas_merch'));
       
       await setDoc(ventaRef, {
         id: ventaRef.id,
-        producto_id,
-        nombre_producto: prod.nombre,
+        producto_id: prod ? prod.id : '',
+        nombre_producto: prod ? prod.nombre : searchMerch.toUpperCase(),
         cantidad,
         monto: total,
         metodo_pago,
@@ -278,10 +283,12 @@ export function useCajaDiaria() {
         creado_el: serverTimestamp()
       });
 
-      // Update stock
-      await updateDoc(doc(db, 'productos', producto_id), {
-        stock: increment(-cantidad)
-      });
+      // Update stock only if product exists in database
+      if (prod) {
+        await updateDoc(doc(db, 'productos', prod.id), {
+          stock: increment(-cantidad)
+        });
+      }
 
       setMerchForm({ producto_id: '', cantidad: 1, monto: '', metodo_pago: 'efectivo' });
       setSearchMerch('');
@@ -432,7 +439,34 @@ export function useCajaDiaria() {
   const torneosPagosHoy = torneosPagos.filter(t => isSameDay(toDate(t.fecha)));
   const egresosHoy = egresos.filter(e => isSameDay(toDate(e.fecha)));
 
-  const allDayItems = [...cuotasHoy, ...otrosHoy, ...merchHoy, ...licenciasHoy, ...inscripcionesFedHoy, ...matriculasHoy, ...segurosHoy, ...torneosPagosHoy];
+  const rawAllDayItems = [
+    ...cuotasHoy.map(x => ({ ...x, _type: 'cuota' as const })),
+    ...otrosHoy.map(x => ({ ...x, _type: 'otro' as const })),
+    ...merchHoy.map(x => ({ ...x, _type: 'merch' as const })),
+    ...licenciasHoy.map(x => ({ ...x, _type: 'licencia' as const })),
+    ...inscripcionesFedHoy.map(x => ({ ...x, _type: 'inscripcion' as const })),
+    ...matriculasHoy.map(x => ({ ...x, _type: 'matricula' as const })),
+    ...segurosHoy.map(x => ({ ...x, _type: 'seguro' as const })),
+    ...torneosPagosHoy.map(x => ({ ...x, _type: 'torneo' as const })),
+  ];
+
+  const getMetodoOrder = (item: any) => {
+    const m = getMetodo(item);
+    if (m === 'efectivo') return 1;
+    if (m === 'debito') return 2;
+    if (m === 'transferencia' || m === 'mp' || m === 'mercado pago' || m === 'mercado_pago') return 3;
+    return 4;
+  };
+
+  const allDayItems = [...rawAllDayItems].sort((a: any, b: any) => {
+    const orderA = getMetodoOrder(a);
+    const orderB = getMetodoOrder(b);
+    if (orderA !== orderB) return orderA - orderB;
+
+    const timeA = (a.fecha_pago || a.fecha) ? toDate(a.fecha_pago || a.fecha).getTime() : 0;
+    const timeB = (b.fecha_pago || b.fecha) ? toDate(b.fecha_pago || b.fecha).getTime() : 0;
+    return timeA - timeB;
+  });
 
   const totalIngEfvoHoy = sumMonto(allDayItems.filter(isEfectivo));
   const ingDebitoHoy = sumMonto(allDayItems.filter(isDebito));
