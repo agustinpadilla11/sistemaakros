@@ -11,6 +11,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailReadOnly, setEmailReadOnly] = useState(true);
+  const [passwordReadOnly, setPasswordReadOnly] = useState(true);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -61,6 +63,9 @@ export default function Login() {
               required 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="off"
+              readOnly={emailReadOnly}
+              onFocus={() => setEmailReadOnly(false)}
               className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none"
             />
           </div>
@@ -71,6 +76,9 @@ export default function Login() {
               required 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              readOnly={passwordReadOnly}
+              onFocus={() => setPasswordReadOnly(false)}
               className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none"
             />
           </div>

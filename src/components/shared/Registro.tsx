@@ -11,6 +11,8 @@ export default function Registro() {
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailReadOnly, setEmailReadOnly] = useState(true);
+  const [passwordReadOnly, setPasswordReadOnly] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,11 +60,30 @@ export default function Registro() {
           </div>
           <div>
             <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
+            <input 
+              type="email" 
+              required 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              autoComplete="off"
+              readOnly={emailReadOnly}
+              onFocus={() => setEmailReadOnly(false)}
+              className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" 
+            />
           </div>
           <div>
             <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Contraseña</label>
-            <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" />
+            <input 
+              type="password" 
+              required 
+              minLength={6} 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              autoComplete="new-password"
+              readOnly={passwordReadOnly}
+              onFocus={() => setPasswordReadOnly(false)}
+              className="w-full bg-slate-50 border-slate-200 rounded p-3 text-xs font-bold border focus:ring-purple-500 focus:border-purple-500 outline-none" 
+            />
           </div>
           
           <button type="submit" disabled={loading} className="w-full bg-purple-600 text-white p-3 rounded text-[10px] uppercase font-bold tracking-widest hover:bg-purple-700 disabled:opacity-50 mt-2 transition-colors">
