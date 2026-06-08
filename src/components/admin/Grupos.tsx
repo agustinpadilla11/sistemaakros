@@ -357,7 +357,7 @@ export default function Grupos() {
         });
       }
       updateLocalAlumnasAndCounts(alumnaId, '');
-      await updateDoc(doc(db, 'alumnas', alumnaId), { grupo_id: '' });
+      await updateDoc(doc(db, 'alumnas', alumnaId), { grupo_id: '', estado: 'inactiva' });
       loadData();
     } catch (err) { console.error(err); }
   };
@@ -597,7 +597,10 @@ export default function Grupos() {
              <div className="flex-1 overflow-y-auto p-0 bg-white">
                 <table className="w-full text-left">
                    <tbody className="divide-y divide-slate-50">
-                      {todasAlumnas.filter(a => a.grupo_id === managingGroup.id).map(a => (
+                      {todasAlumnas
+                          .filter(a => a.grupo_id === managingGroup.id)
+                          .sort((a, b) => (a.nombre_completo || '').localeCompare(b.nombre_completo || ''))
+                          .map(a => (
                          <tr key={a.id} className="hover:bg-slate-50 transition-colors group">
                             <td className="px-8 py-4">
                               <p className="text-xs font-black uppercase text-slate-700">{a.nombre_completo}</p>

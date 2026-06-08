@@ -168,6 +168,8 @@ export interface ArqueoData {
   real: number;
   diferencia: number;
   usuario: string;
+  entregado_duena?: number;
+  quedo_caja?: number;
 }
 
 export interface CajaDoc {

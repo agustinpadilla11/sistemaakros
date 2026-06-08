@@ -19,7 +19,7 @@ export default function CajaDiaria() {
     handlePOSCuota, handlePOSMerch, handlePOSOtro,
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
-    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, arqueoData, handleArqueo,
+    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, toast,
     deleteEgreso, deleteIngreso,
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy, allDayItems,
@@ -28,6 +28,39 @@ export default function CajaDiaria() {
     cajaFinalEfvo, cajaFinalDebito, cajaFinalTransf, totalFinalTodo,
     totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes, resetDailyData
   } = caja;
+
+  const cuotaSearchInputRef = React.useRef<HTMLInputElement>(null);
+  const merchSearchInputRef = React.useRef<HTMLInputElement>(null);
+  const otroSearchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Focus correct input when active tab changes
+  React.useEffect(() => {
+    if (posTab === 'cuota') {
+      cuotaSearchInputRef.current?.focus();
+    } else if (posTab === 'merch') {
+      merchSearchInputRef.current?.focus();
+    } else if (posTab === 'otro') {
+      otroSearchInputRef.current?.focus();
+    }
+  }, [posTab]);
+
+  // Tab switching shortcuts Alt+1, Alt+2, Alt+3
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === '1') {
+        e.preventDefault();
+        setPosTab('cuota');
+      } else if (e.altKey && e.key === '2') {
+        e.preventDefault();
+        setPosTab('merch');
+      } else if (e.altKey && e.key === '3') {
+        e.preventDefault();
+        setPosTab('otro');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setPosTab]);
 
   const getMetodo = (item: any) => item.metodo_pago || item.metodo || 'efectivo';
 
@@ -97,6 +130,7 @@ export default function CajaDiaria() {
                     <div className="col-span-2 relative">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Gimnasta</label>
                       <input 
+                        ref={cuotaSearchInputRef}
                         list="alumnas-list"
                         type="text" 
                         required 
@@ -159,6 +193,7 @@ export default function CajaDiaria() {
                     <div className="col-span-2 relative">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Producto</label>
                       <input 
+                        ref={merchSearchInputRef}
                         list="productos-list"
                         type="text" 
                         required 
@@ -228,6 +263,7 @@ export default function CajaDiaria() {
                     <div className="col-span-2 relative">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Gimnasta (Opcional)</label>
                       <input
+                        ref={otroSearchInputRef}
                         type="text"
                         list="alumnas-list-otro"
                         value={searchOtro}
@@ -369,46 +405,72 @@ export default function CajaDiaria() {
                   </div>
                 </div>
               </div>
-
-              {/* Right Column: Handover options / Call to Action */}
+                 {/* Right Column: Handover options / Call to Action */}
               <div className="lg:w-[350px] shrink-0 bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-center gap-3">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Caja en Vivo / Estado Actual</span>
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${arqueoData ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700 animate-pulse'}`}>
+                    {arqueoData ? 'Arqueado' : 'En Vivo'}
+                  </span>
+                </div>
+
                 {!arqueoData ? (
-                  <div className="text-center py-2 space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Paso Final del Recepcionista</p>
+                  // Live Register display before Arqueo
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo en Caja (Est.):</span>
+                      <span className="text-sm font-black text-emerald-600">{formatter.format(cajaFinalEfvo)}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
+                        <span>Se entregaría a Dueña:</span>
+                        <span className="text-purple-700">{formatter.format(Math.max(0, cajaFinalEfvo - comienzoCaja))}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[9px] font-medium text-slate-400 uppercase">
+                        <span>Fondo que queda en caja:</span>
+                        <span>{formatter.format(comienzoCaja)}</span>
+                      </div>
+                    </div>
                     <button 
-                      onClick={() => setShowArqueo(true)} 
+                      onClick={() => {
+                        setEfectivoReal(cajaFinalEfvo.toString());
+                        setEntregadoDuena(Math.max(0, cajaFinalEfvo - comienzoCaja).toString());
+                        setShowArqueo(true);
+                      }} 
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
                     >
-                      <CheckCircle2 className="w-4 h-4" /> Contar y Arquear Caja
+                      <CheckCircle2 className="w-4 h-4" /> Realizar Arqueo
                     </button>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase">Debes contar el efectivo real en caja antes de cerrar.</p>
                   </div>
                 ) : (
+                  // Display real saved numbers after Arqueo
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Efectivo Real Contado:</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Efectivo Real Contado:</span>
                       <span className="text-sm font-black text-slate-800">{formatter.format(arqueoData.real)}</span>
                     </div>
 
-                    <div className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase text-center ${arqueoData.diferencia === 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : arqueoData.diferencia > 0 ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
+                    <div className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-center ${arqueoData.diferencia === 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : arqueoData.diferencia > 0 ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
                       {arqueoData.diferencia === 0 ? '✔ Caja Perfecta' : arqueoData.diferencia > 0 ? `⚠ Sobran ${formatter.format(arqueoData.diferencia)}` : `❌ Faltan ${formatter.format(Math.abs(arqueoData.diferencia))}`}
                     </div>
 
-                    <div className="space-y-2 pt-1">
-                      <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                        <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">Opción A: Dejar Fondo Inicial</span>
-                        <p className="text-[9px] text-slate-400 leading-tight">Deja {formatter.format(comienzoCaja)} en la caja para mañana y entrega a la dueña:</p>
-                        <span className="block text-base font-black text-purple-700 mt-1">{formatter.format(Math.max(0, arqueoData.real - comienzoCaja))}</span>
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Entregado a la Dueña:</span>
+                        <span className="text-sm font-black text-purple-700">{formatter.format(arqueoData.entregado_duena || 0)}</span>
                       </div>
-                      <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                        <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">Opción B: Entregar TODO el efectivo</span>
-                        <p className="text-[9px] text-slate-400 leading-tight">Deja la caja en $0.00 para mañana y entrega a la dueña:</p>
-                        <span className="block text-base font-black text-purple-700 mt-1">{formatter.format(arqueoData.real)}</span>
+                      <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Quedó en la Caja:</span>
+                        <span className="text-sm font-black text-slate-700">{formatter.format(arqueoData.quedo_caja || 0)}</span>
                       </div>
                     </div>
 
                     <button 
-                      onClick={() => setShowArqueo(true)}
+                      onClick={() => {
+                        setEfectivoReal(arqueoData.real.toString());
+                        setEntregadoDuena((arqueoData.entregado_duena || 0).toString());
+                        setShowArqueo(true);
+                      }}
                       className="w-full text-center text-[9px] font-black uppercase text-purple-600 hover:text-purple-800 underline tracking-widest mt-1 block"
                     >
                       Volver a Arquear / Corregir
@@ -416,7 +478,6 @@ export default function CajaDiaria() {
                   </div>
                 )}
               </div>
-
             </div>
           </div>
 
@@ -736,21 +797,36 @@ export default function CajaDiaria() {
         <div className="fixed inset-0 bg-slate-900/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
              <h2 className="text-sm font-bold uppercase mb-4">Arqueo de Caja</h2>
-             <div className="bg-slate-50 p-3 rounded mb-4 flex justify-between items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Esperado:</span>
-                <span className="text-xs font-black text-slate-700">{formatter.format(cajaFinalEfvo)}</span>
+             <div className="bg-slate-50 p-3 rounded mb-4 flex justify-between items-center text-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Esperado en Caja:</span>
+                <span className="font-black text-slate-700">{formatter.format(cajaFinalEfvo)}</span>
              </div>
              <form onSubmit={handleArqueo} className="space-y-4">
-               <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Efectivo Real ($)</label>
-                  <input type="number" required value={efectivoReal} onChange={e=>setEfectivoReal(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" />
-               </div>
-               <div className="flex gap-2 justify-end">
-                  <button type="button" onClick={()=>setShowArqueo(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600">Cancelar</button>
-                  <button type="submit" className="px-4 py-2 bg-purple-600 rounded text-[10px] uppercase font-bold text-white">Guardar Cierre</button>
-               </div>
+                <div>
+                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Efectivo Real Contado ($)</label>
+                   <input type="number" required value={efectivoReal} onChange={e=>setEfectivoReal(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" />
+                </div>
+                <div>
+                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Entregado a la Dueña ($)</label>
+                   <input type="number" required value={entregadoDuena} onChange={e=>setEntregadoDuena(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" />
+                </div>
+                <div className="bg-purple-50 p-3 rounded flex justify-between items-center text-xs font-bold">
+                   <span className="text-[10px] text-purple-600 uppercase">Queda en Caja (Est.):</span>
+                   <span className="text-purple-900">{formatter.format(Math.max(0, (Number(efectivoReal) || 0) - (Number(entregadoDuena) || 0)))}</span>
+                </div>
+                <div className="flex gap-2 justify-end pt-2">
+                   <button type="button" onClick={()=>setShowArqueo(false)} className="px-4 py-2 bg-slate-100 rounded text-[10px] uppercase font-bold text-slate-600">Cancelar</button>
+                   <button type="submit" className="px-4 py-2 bg-purple-600 rounded text-[10px] uppercase font-bold text-white">Guardar Cierre</button>
+                </div>
              </form>
           </div>
+        </div>
+      )}
+
+      {/* TOAST SYSTEM */}
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-bounce">
+           <span className="text-xs font-bold uppercase tracking-wider">{toast}</span>
         </div>
       )}
     </div>

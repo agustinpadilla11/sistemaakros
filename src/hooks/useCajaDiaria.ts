@@ -65,7 +65,14 @@ export function useCajaDiaria() {
   const [cajaFormOpen, setCajaFormOpen] = useState(false);
   const [showArqueo, setShowArqueo] = useState(false);
   const [efectivoReal, setEfectivoReal] = useState('');
+  const [entregadoDuena, setEntregadoDuena] = useState('');
   const [arqueoData, setArqueoData] = useState<ArqueoData | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Derived Dates
   const dateStr = currentDate.toISOString().split('T')[0];
@@ -228,7 +235,7 @@ export function useCajaDiaria() {
       setCuotaForm({ ...cuotaForm, alumna_id: '', monto: '' });
       setSearchCuota('');
       await loadData();
-      alert('¡Cobro registrado con éxito!');
+      showToast('Cuota cargada con éxito');
     } catch (err) {
       console.error('Error en handlePOSCuota:', err);
       alert('Error al registrar el cobro: ' + (err instanceof Error ? err.message : 'Error desconocido'));
@@ -293,7 +300,7 @@ export function useCajaDiaria() {
       setMerchForm({ producto_id: '', cantidad: 1, monto: '', metodo_pago: 'efectivo' });
       setSearchMerch('');
       await loadData();
-      alert('¡Venta realizada con éxito!');
+      showToast('Venta cargada con éxito');
     } catch (err) {
       console.error('Error en handlePOSMerch:', err);
       alert('Error al registrar la venta: ' + (err instanceof Error ? err.message : 'Error desconocido'));
@@ -328,6 +335,7 @@ export function useCajaDiaria() {
       setOtroForm({ alumna_id: '', concepto: '', monto: '', metodo_pago: 'efectivo' });
       setSearchOtro('');
       await loadData();
+      showToast('Ingreso extra cargado con éxito');
     } catch (err) {
       console.error(err);
       alert('Error al registrar ingreso extra');
@@ -404,18 +412,25 @@ export function useCajaDiaria() {
   const handleArqueo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const data: ArqueoData = {
+      const realNum = Number(efectivoReal);
+      const entregadoNum = Number(entregadoDuena);
+      const quedoNum = realNum - entregadoNum;
+
+      const data: any = {
         fecha: serverTimestamp() as any,
         esperado: cajaFinalEfvo,
-        real: Number(efectivoReal),
-        diferencia: Number(efectivoReal) - cajaFinalEfvo,
+        real: realNum,
+        entregado_duena: entregadoNum,
+        quedo_caja: quedoNum,
+        diferencia: realNum - cajaFinalEfvo,
         usuario: 'Administración'
       };
       await setDoc(doc(db, 'arqueos', dateStr), data);
       setArqueoData(data);
       setShowArqueo(false);
       setEfectivoReal('');
-      alert('¡Arqueo de caja guardado con éxito!');
+      setEntregadoDuena('');
+      showToast('Arqueo de caja guardado con éxito');
     } catch (err) {
       console.error(err);
       alert('Error al guardar arqueo');
@@ -450,22 +465,10 @@ export function useCajaDiaria() {
     ...torneosPagosHoy.map(x => ({ ...x, _type: 'torneo' as const })),
   ];
 
-  const getMetodoOrder = (item: any) => {
-    const m = getMetodo(item);
-    if (m === 'efectivo') return 1;
-    if (m === 'debito') return 2;
-    if (m === 'transferencia' || m === 'mp' || m === 'mercado pago' || m === 'mercado_pago') return 3;
-    return 4;
-  };
-
   const allDayItems = [...rawAllDayItems].sort((a: any, b: any) => {
-    const orderA = getMetodoOrder(a);
-    const orderB = getMetodoOrder(b);
-    if (orderA !== orderB) return orderA - orderB;
-
     const timeA = (a.fecha_pago || a.fecha) ? toDate(a.fecha_pago || a.fecha).getTime() : 0;
     const timeB = (b.fecha_pago || b.fecha) ? toDate(b.fecha_pago || b.fecha).getTime() : 0;
-    return timeA - timeB;
+    return timeB - timeA;
   });
 
   const totalIngEfvoHoy = sumMonto(allDayItems.filter(isEfectivo));
@@ -622,7 +625,7 @@ export function useCajaDiaria() {
     // Egreso / Caja / Arqueo
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
-    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, arqueoData, handleArqueo,
+    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, toast,
     deleteEgreso, deleteIngreso,
     // Daily calcs
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,

@@ -168,16 +168,17 @@ export default function FichaAlumna() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, forceActive?: boolean) => {
     e.preventDefault();
     setSaving(true);
     try {
+      const targetEstado = forceActive ? 'activa' : formData.estado;
       const dataToSave = {
         nombre_completo: formData.nombre_completo,
         dni: formData.dni,
         fecha_nacimiento: formData.fecha_nacimiento ? new Date(formData.fecha_nacimiento) : null,
-        grupo_id: formData.grupo_id,
-        estado: formData.estado,
+        grupo_id: targetEstado === 'inactiva' ? '' : formData.grupo_id,
+        estado: targetEstado,
         nombre_padre: formData.nombre_padre,
         telefono_padre: formData.telefono_padre,
         nombre_madre: formData.nombre_madre,
@@ -222,7 +223,7 @@ export default function FichaAlumna() {
 
         await updateDoc(docRef, dataToSave);
 
-        if (formData.estado === 'inactiva' && currentData?.estado !== 'inactiva') {
+        if (targetEstado === 'inactiva' && currentData?.estado !== 'inactiva') {
           let grupoNombre = 'SIN GRUPO';
           let grupoHorario = '';
           if (formData.grupo_id) {
@@ -400,10 +401,34 @@ export default function FichaAlumna() {
             
           </div>
           
-          <div className="pt-4 flex justify-end">
-             <button type="submit" disabled={saving} className="bg-purple-600 text-white px-6 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 disabled:opacity-50">
-               {saving ? 'Guardando...' : 'Guardar Gimnasta'}
-             </button>
+          <div className="pt-4 flex justify-end gap-3">
+             {formData.estado === 'pendiente_aprobacion' ? (
+               <>
+                 <button 
+                   type="button" 
+                   onClick={(e) => handleSubmit(e, true)} 
+                   disabled={saving} 
+                   className="bg-emerald-600 text-white px-6 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50 shadow-sm"
+                 >
+                   {saving ? 'Validando...' : 'Guardar y Validar'}
+                 </button>
+                 <button 
+                   type="submit" 
+                   disabled={saving} 
+                   className="bg-purple-600 text-white px-6 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 disabled:opacity-50"
+                 >
+                   {saving ? 'Guardando...' : 'Guardar Pendiente'}
+                 </button>
+               </>
+             ) : (
+               <button 
+                 type="submit" 
+                 disabled={saving} 
+                 className="bg-purple-600 text-white px-6 py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-purple-700 disabled:opacity-50"
+               >
+                 {saving ? 'Guardando...' : 'Guardar Gimnasta'}
+               </button>
+             )}
           </div>
         </form>
       </div>

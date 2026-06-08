@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, getDocs, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Users, AlertCircle, DollarSign, Calendar, Mail } from 'lucide-react';
+import { Users, AlertCircle, DollarSign, Calendar, Mail, XCircle } from 'lucide-react';
 import { isBefore, addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,6 +24,8 @@ export default function AdminDashboard() {
   const [alertasPago, setAlertasPago] = useState<any[]>([]);
   const [pendientesList, setPendientesList] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [showTodayPaymentsModal, setShowTodayPaymentsModal] = useState(false);
+  const [cuotasHoy, setCuotasHoy] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadStats() {
@@ -93,6 +95,35 @@ export default function AdminDashboard() {
         aptosPorVencer: aptosXVencer,
         pendientesAprobacion: pendientesCount
       });
+
+      // Fetch paid cuotas for today list modal
+      const paidCuotasSnap = await getDocs(query(
+        collection(db, 'cuotas'),
+        where('estado', '==', 'pagado')
+      ));
+
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+      const cuotasHoyTemp: any[] = [];
+      paidCuotasSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.fecha_pago) {
+          const fp = data.fecha_pago.toDate ? data.fecha_pago.toDate() : new Date(data.fecha_pago);
+          if (fp >= todayStart && fp <= todayEnd) {
+            const alumna = alumnasSnap.docs.find(a => a.id === data.alumna_id)?.data();
+            cuotasHoyTemp.push({
+              id: doc.id,
+              ...data,
+              gimnasta: alumna ? alumna.nombre_completo : 'Desconocida',
+              medio: data.metodo_pago || data.metodo || 'Efectivo',
+              fechaPagoDate: fp
+            });
+          }
+        }
+      });
+      cuotasHoyTemp.sort((a, b) => b.fechaPagoDate.getTime() - a.fechaPagoDate.getTime());
+      setCuotasHoy(cuotasHoyTemp);
 
       const unpaidSnap = await getDocs(query(
         collection(db, 'cuotas'),
@@ -220,10 +251,11 @@ export default function AdminDashboard() {
         <StatCard 
           title="Cuotas Cobradas (Mes)"
           value={stats.cuotasMesPagadas}
-          subtitle="Pagos del mes"
-          subColor="text-emerald-600"
+          subtitle="Pagos del mes · Ver hoy ↗"
+          subColor="text-emerald-600 font-bold"
           borderColor="border-l-emerald-500"
           valueColor="text-emerald-600"
+          onClick={() => setShowTodayPaymentsModal(true)}
         />
       </div>
 
@@ -384,13 +416,97 @@ export default function AdminDashboard() {
           <p className="text-xs text-slate-300 uppercase tracking-widest font-bold">En desarrollo</p>
         </div>
       </div>
+
+      {/* MODAL CUOTAS DE HOY */}
+      {showTodayPaymentsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                   <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Cuotas Pagadas Hoy</h2>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                     Detalle de ingresos por cuotas del día
+                   </p>
+                </div>
+                <button onClick={() => setShowTodayPaymentsModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                   <XCircle className="w-8 h-8"/>
+                </button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-6 bg-white">
+                {cuotasHoy.length > 0 ? (
+                  <table className="w-full text-left">
+                     <thead>
+                        <tr className="text-[10px] uppercase text-slate-400 tracking-widest font-black border-b border-slate-100 pb-3">
+                           <th className="pb-4">Gimnasta</th>
+                           <th className="pb-4 text-center">Cuota de</th>
+                           <th className="pb-4 text-center">Método</th>
+                           <th className="pb-4 text-center">Pagado el</th>
+                           <th className="pb-4 text-right">Monto</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-50">
+                        {cuotasHoy.map((c, idx) => (
+                           <tr key={c.id || idx} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-4 text-xs font-black uppercase text-slate-800">{c.gimnasta}</td>
+                              <td className="py-4 text-xs text-slate-500 font-medium text-center uppercase">
+                                 {c.mes}/{c.anio}
+                              </td>
+                              <td className="py-4 text-center">
+                                 <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-purple-50 text-purple-700">
+                                    {c.medio}
+                                 </span>
+                              </td>
+                              <td className="py-4 text-xs text-slate-500 font-medium text-center">
+                                 {format(c.fechaPagoDate, "dd/MM/yyyy HH:mm")} hs
+                              </td>
+                              <td className="py-4 text-xs font-bold text-emerald-600 text-right">
+                                 ${c.monto.toLocaleString('es-AR')}
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+                ) : (
+                  <div className="py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                     No se han registrado cuotas pagadas en el día de hoy.
+                  </div>
+                )}
+             </div>
+             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                <div className="text-left">
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Hoy:</span>
+                   <p className="text-lg font-black text-emerald-600">
+                      ${cuotasHoy.reduce((acc, c) => acc + c.monto, 0).toLocaleString('es-AR')}
+                   </p>
+                </div>
+                <button 
+                  onClick={() => setShowTodayPaymentsModal(false)} 
+                  className="px-6 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-colors shadow-lg"
+                >
+                  Cerrar
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StatCard({ title, value, subtitle, subColor, borderColor, valueColor = "text-slate-800" }: any) {
+function StatCard({ title, value, subtitle, subColor, borderColor, valueColor = "text-slate-800", onClick }: any) {
+  const isClickable = !!onClick;
   return (
-    <div className={`bg-white p-5 rounded-xl border border-slate-200 shadow-sm ${borderColor.includes('border-l-') ? borderColor + ' border-l-4' : ''}`}>
+    <div 
+      onClick={onClick}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      className={`bg-white p-5 rounded-xl border border-slate-200 shadow-sm text-left transition-all ${
+        borderColor.includes('border-l-') ? borderColor + ' border-l-4' : ''
+      } ${
+        isClickable ? 'hover:shadow-md hover:border-emerald-400 cursor-pointer active:scale-95 duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500' : ''
+      }`}
+    >
       <p className="text-xs font-bold text-slate-400 uppercase">{title}</p>
       <p className={`text-3xl font-black mt-1 ${valueColor}`}>{value}</p>
       {subtitle && <div className={`text-xs font-bold mt-2 ${subColor}`}>{subtitle}</div>}
