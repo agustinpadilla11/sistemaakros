@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Plus, Edit, Trash2, Trophy, Search, FileUp, Printer, Download, UserPlus, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Trophy, Search, FileUp, Printer, Download, UserPlus, Users, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function Torneos() {
@@ -87,7 +87,7 @@ export default function Torneos() {
         categoria: (pagoForm.categoria || '').toString().toUpperCase(),
         torneo_id: selectedTorneo.id,
         monto: parsedMonto || 0,
-        fecha: new Date(pagoForm.fecha),
+        fecha: new Date(pagoForm.fecha + 'T12:00:00'),
         tipo: 'torneo'
       };
       if (isEditingPago === 'nuevo') {
@@ -115,28 +115,21 @@ export default function Torneos() {
       const ws = wb.Sheets[wsname];
       const data: any[] = XLSX.utils.sheet_to_json(ws);
       
-      if (confirm(`¿Importar ${data.length} registros a este torneo?`)) {
-        const parseAmount = (val: any) => {
-          if (!val) return 0;
-          const s = val.toString().replace(/[^0-9,.]/g, '');
-          if (s.includes(',') && s.includes('.')) {
-            // Mixed format, assume dot is thousands and comma is decimal (common in AR)
-            return parseFloat(s.replace(/\./g, '').replace(',', '.'));
-          }
-          // Only comma or only dot
-          return parseFloat(s.replace(',', '.'));
-        };
-
+      if (confirm(`¿Importar ${data.length} registros a este torneo? (Solo se tomarán los nombres)`)) {
         for (const item of data) {
+           const firstValue = Object.values(item)[0];
+           const name = (item.Nombre || item['Nombre y Apellido'] || item.nombre_completo || item.nombre || firstValue || 'S/N').toString().toUpperCase();
+
            const newRef = doc(collection(db, 'torneos_pagos'));
            await setDoc(newRef, {
              id: newRef.id,
-             alumna_nombre: (item.Nombre || item.nombre_completo || item.nombre || 'S/N').toString().toUpperCase(),
+             alumna_nombre: name,
              torneo_id: selectedTorneo.id,
-             categoria: (item.Categoria || item.categoria || '').toString().toUpperCase(),
-             monto: parseAmount(item.Monto || item.monto),
-             metodo: 'transferencia',
-             fecha: new Date(),
+             categoria: '',
+             monto: 0,
+             metodo: 'efectivo',
+             fecha: null,
+             estado: 'pendiente',
              tipo: 'torneo'
            });
         }
@@ -204,7 +197,11 @@ export default function Torneos() {
     printWindow.document.close();
   };
 
-  const currentPagos = selectedTorneo ? pagos.filter(p => p.torneo_id === selectedTorneo.id) : [];
+  const currentPagos = selectedTorneo 
+    ? pagos
+        .filter(p => p.torneo_id === selectedTorneo.id && p.alumna_nombre.includes(searchTerm.toUpperCase()))
+        .sort((a, b) => a.alumna_nombre.localeCompare(b.alumna_nombre))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -295,12 +292,6 @@ export default function Torneos() {
                 <p className="text-xl font-black text-slate-800">{currentPagos.length}</p>
              </div>
              <div className="flex gap-2">
-                <button 
-                  onClick={() => { setPagoForm({alumna_nombre: '', torneo_id: selectedTorneo.id, categoria: '', monto: '', metodo: 'efectivo', fecha: new Date().toISOString().split('T')[0]}); setSearchTerm(''); setIsEditingPago('nuevo'); }}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 bg-amber-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-amber-700 transition-all shadow-md shadow-amber-100"
-                >
-                  <Plus className="w-5 h-5" /> Cobrar Pago
-                </button>
                 <div className="flex-1 relative">
                   <input type="file" onChange={handleImportExcel} className="hidden" id="excel-import" />
                   <label htmlFor="excel-import" className="h-full flex flex-col items-center justify-center gap-1 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-100 transition-colors border border-emerald-200 cursor-pointer">
@@ -330,20 +321,8 @@ export default function Torneos() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Categoría</label>
-                      <input type="text" value={pagoForm.categoria} onChange={e=>setPagoForm({...pagoForm, categoria: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 uppercase" placeholder="Ej: C1 Mayor" />
-                    </div>
-                    <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto ($)</label>
                       <input type="text" required value={pagoForm.monto} onChange={e=>setPagoForm({...pagoForm, monto: e.target.value.replace(/[^0-9,.]/g, '')})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Método</label>
-                      <select required value={pagoForm.metodo} onChange={e=>setPagoForm({...pagoForm, metodo: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold uppercase border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500">
-                        <option value="efectivo">Efectivo</option>
-                        <option value="debito">Débito</option>
-                        <option value="transferencia">Transferencia</option>
-                      </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha</label>
@@ -358,33 +337,61 @@ export default function Torneos() {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <h3 className="text-sm font-bold uppercase tracking-tight text-slate-800">Participantes</h3>
+              <div className="relative w-full sm:max-w-sm">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text"
+                  placeholder="Buscar participante (A-Z)..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                />
+              </div>
+            </div>
             <table className="w-full text-left">
               <thead>
                 <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-b border-slate-200 font-black">
-                  <th className="px-6 py-4">Fecha</th>
                   <th className="px-6 py-4">Gimnasta</th>
-                  <th className="px-6 py-4">Categoría</th>
-                  <th className="px-6 py-4">Monto</th>
-                  <th className="px-6 py-4">Método</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {currentPagos.length === 0 ? (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-slate-400 font-bold uppercase">Sin pagos registrados para este torneo</td></tr>
+                  <tr><td colSpan={2} className="px-6 py-12 text-center text-xs text-slate-400 font-bold uppercase">Sin participantes registrados</td></tr>
                 ) : (
                   currentPagos.map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 text-xs text-slate-600 font-bold">{p.dateObj.toLocaleDateString('es-AR')}</td>
-                      <td className="px-6 py-4 text-xs font-black text-slate-800 uppercase">{p.alumna_nombre}</td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{p.categoria || '-'}</td>
-                      <td className="px-6 py-4 text-sm font-black text-amber-700">${p.monto.toLocaleString('es-AR')}</td>
-                      <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded">{p.metodo}</span></td>
+                    <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.monto > 0 ? 'bg-emerald-50/40' : ''}`}>
+                      <td className="px-6 py-4 text-sm font-black text-slate-800 uppercase flex items-center gap-2">
+                        {p.monto > 0 && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                        {p.alumna_nombre}
+                      </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-3 text-slate-400">
-                          <button onClick={()=>{setPagoForm({alumna_nombre: p.alumna_nombre, torneo_id: p.torneo_id, categoria: p.categoria, monto: p.monto.toString(), metodo: p.metodo, fecha: p.dateObj.toISOString().split('T')[0]}); setIsEditingPago(p);}} className="hover:text-amber-600"><Edit className="w-4 h-4" /></button>
-                          <button onClick={async ()=>{if(confirm('¿Eliminar registro?')) { await deleteDoc(doc(db, 'torneos_pagos', p.id)); loadData(); }}} className="hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                        <div className="flex justify-end gap-3 text-slate-400 items-center">
+                          {(!p.monto || p.monto === 0) ? (
+                            <button 
+                              onClick={()=>{setPagoForm({alumna_nombre: p.alumna_nombre, torneo_id: p.torneo_id, categoria: '', monto: '', metodo: 'efectivo', fecha: new Date().toISOString().split('T')[0]}); setIsEditingPago(p);}} 
+                              className="text-[10px] uppercase font-black bg-amber-100 text-amber-700 px-4 py-2 rounded-lg hover:bg-amber-200 transition-colors whitespace-nowrap shadow-sm"
+                            >
+                              Cargar Pago
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-4 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                              <div className="text-right">
+                                <span className="block text-xs font-black text-emerald-600">${p.monto.toLocaleString('es-AR')}</span>
+                                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.dateObj ? p.dateObj.toLocaleDateString('es-AR') : ''}</span>
+                              </div>
+                              <div className="flex items-center gap-2 border-l border-slate-100 pl-3">
+                                <button onClick={()=>{setPagoForm({alumna_nombre: p.alumna_nombre, torneo_id: p.torneo_id, categoria: '', monto: p.monto.toString(), metodo: p.metodo, fecha: p.fecha ? p.dateObj.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}); setIsEditingPago(p);}} className="hover:text-amber-600 text-slate-400 p-1.5 hover:bg-slate-50 rounded transition-colors"><Edit className="w-4 h-4" /></button>
+                                <button onClick={async ()=>{if(confirm('¿Eliminar registro?')) { await deleteDoc(doc(db, 'torneos_pagos', p.id)); loadData(); }}} className="hover:text-red-600 text-slate-400 p-1.5 hover:bg-slate-50 rounded transition-colors"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            </div>
+                          )}
+                          {(!p.monto || p.monto === 0) && (
+                            <button onClick={async ()=>{if(confirm('¿Eliminar registro?')) { await deleteDoc(doc(db, 'torneos_pagos', p.id)); loadData(); }}} className="hover:text-red-600 p-2"><Trash2 className="w-4 h-4" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>

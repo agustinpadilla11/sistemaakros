@@ -98,7 +98,7 @@ export default function Alumnas() {
                         a.dni?.includes(search);
     const matchEstado = a.estado === filterEstado;
     return matchSearch && matchEstado;
-  });
+  }).sort((a, b) => (a.nombre_completo || '').localeCompare(b.nombre_completo || ''));
 
   const getAltasPorMes = () => {
     const groups: Record<string, any[]> = {};

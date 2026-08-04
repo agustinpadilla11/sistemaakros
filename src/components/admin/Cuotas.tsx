@@ -34,8 +34,52 @@ export default function Cuotas() {
 
   const [searchTermGlobal, setSearchTermGlobal] = useState('');
   const [selectedHistoryAlumna, setSelectedHistoryAlumna] = useState<any>(null);
+  const [isDeudorasOpen, setIsDeudorasOpen] = useState(false);
 
   const today = new Date();
+
+  const getDeudoras = () => {
+    const currentMonth = today.getMonth() + 1; 
+    const isCurrentYear = yearFil === today.getFullYear();
+    const isPastYear = yearFil < today.getFullYear();
+    
+    let maxMonth;
+    if (isPastYear) {
+      maxMonth = 12;
+    } else if (isCurrentYear) {
+      if (today.getDate() > 15) {
+        maxMonth = currentMonth;
+      } else {
+        maxMonth = currentMonth - 1;
+      }
+    } else {
+      maxMonth = 0;
+    }
+
+    const deudoras: any[] = [];
+
+    alumnas.filter(a => a.estado !== 'inactiva').forEach(alu => {
+      const aluCuotas = cuotas[alu.id] || [];
+      const mesesAdeudados: string[] = [];
+      
+      // Empezamos desde Junio (mes 6) según lo solicitado, ignorando Mayo
+      for (let i = 6; i <= maxMonth; i++) {
+        const c = aluCuotas.find(x => x.mes === i);
+        if (!c || c.estado !== 'pagado') {
+          mesesAdeudados.push(MESES[i - 1]);
+        }
+      }
+
+      if (mesesAdeudados.length > 0) {
+        deudoras.push({
+          nombre: alu.nombre_completo,
+          meses: mesesAdeudados
+        });
+      }
+    });
+
+    return deudoras.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  };
   const [yearFil, setYearFil] = useState(today.getFullYear());
 
   const loadData = async () => {
@@ -297,6 +341,13 @@ export default function Cuotas() {
           </button>
           
           <button 
+            onClick={() => setIsDeudorasOpen(true)}
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-red-100 text-red-700 px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-red-200 transition-colors"
+          >
+            <span className="whitespace-nowrap">Ver Deudoras</span>
+          </button>
+          
+          <button 
             onClick={() => setIsCobrarOpen(true)}
             className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-purple-600 text-white px-3 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors"
           >
@@ -329,13 +380,13 @@ export default function Cuotas() {
              />
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left bg-white">
-            <thead>
-              <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-white border-b border-slate-100">
-                <th className="p-4 font-black sticky left-0 bg-white border-r border-slate-100 z-10 w-48">Gimnasta</th>
+        <div className="overflow-auto max-h-[65vh]">
+          <table className="w-full text-left bg-white relative">
+            <thead className="sticky top-0 z-20 shadow-sm">
+              <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-b border-slate-100">
+                <th className="p-4 font-black sticky left-0 top-0 bg-slate-50 border-r border-slate-100 z-30 w-48 shadow-sm">Gimnasta</th>
                 {MESES.map((m, i) => (
-                  <th key={m} className={`p-3 font-black text-center w-16 ${(today.getMonth() === i && yearFil === today.getFullYear()) ? 'bg-purple-50 text-purple-600' : ''}`}>
+                  <th key={m} className={`p-3 font-black text-center w-16 sticky top-0 ${(today.getMonth() === i && yearFil === today.getFullYear()) ? 'bg-purple-100 text-purple-700' : 'bg-slate-50'} z-20 shadow-sm`}>
                     {m}
                   </th>
                 ))}
@@ -597,6 +648,50 @@ export default function Cuotas() {
              </div>
              <div className="p-4 bg-slate-50 border-t border-slate-100 text-right">
                 <button onClick={() => setSelectedHistoryAlumna(null)} className="px-6 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-colors shadow-lg">Cerrar Historial</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Deudoras */}
+      {isDeudorasOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                   <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Gimnastas con Deuda</h2>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cuotas pendientes hasta el mes actual ({yearFil})</p>
+                </div>
+                <button onClick={() => setIsDeudorasOpen(false)} className="text-slate-300 hover:text-slate-600 transition-colors">
+                   <XCircle className="w-8 h-8"/>
+                </button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                {getDeudoras().length === 0 ? (
+                   <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                     <span className="text-4xl mb-2">🎉</span>
+                     <p className="text-sm font-bold uppercase tracking-widest">No hay deudoras para este periodo.</p>
+                   </div>
+                ) : (
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                     {getDeudoras().map((d, i) => (
+                        <div key={i} className="flex flex-col bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-red-200 hover:shadow-md transition-all">
+                           <span className="font-black text-slate-800 uppercase text-xs mb-3 truncate" title={d.nombre}>{d.nombre}</span>
+                           <div className="flex flex-wrap gap-1.5">
+                              {d.meses.map((m: string) => (
+                                <span key={m} className="text-[9px] font-black bg-red-50 text-red-600 border border-red-100 px-2 py-1 rounded-md uppercase tracking-wider">
+                                  {m}
+                                </span>
+                              ))}
+                           </div>
+                        </div>
+                     ))}
+                   </div>
+                )}
+             </div>
+             <div className="p-4 bg-slate-50 border-t border-slate-100 text-right">
+                <button onClick={() => setIsDeudorasOpen(false)} className="px-6 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-colors shadow-lg">Cerrar</button>
              </div>
           </div>
         </div>

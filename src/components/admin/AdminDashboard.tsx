@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, getDocs, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Users, AlertCircle, DollarSign, Calendar, Mail, XCircle } from 'lucide-react';
+import { Users, AlertCircle, DollarSign, Calendar, Mail, XCircle, Download } from 'lucide-react';
 import { isBefore, addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AdminDashboard() {
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalActivas: 0,
     cuotasMesPagadas: 0,
+    cuotasHoyPagadas: 0,
     cuotasMesPendientesAmt: 0,
     cuotasMesPendientesCount: 0,
     aptosPorVencer: 0,
@@ -74,29 +76,18 @@ export default function AdminDashboard() {
         where('anio', '==', today.getFullYear())
       ));
 
-      let pagadasCount = 0;
       let unpaidCount = 0;
       let unpaidAmt = 0;
 
       cuotasSnap.forEach(doc => {
         const data = doc.data();
-        if (data.estado === 'pagado') pagadasCount++;
         if (data.estado === 'pendiente' || data.estado === 'vencido') {
           unpaidCount++;
           unpaidAmt += data.monto;
         }
       });
 
-      setStats({
-        totalActivas: activas,
-        cuotasMesPagadas: pagadasCount,
-        cuotasMesPendientesCount: unpaidCount,
-        cuotasMesPendientesAmt: unpaidAmt,
-        aptosPorVencer: aptosXVencer,
-        pendientesAprobacion: pendientesCount
-      });
-
-      // Fetch paid cuotas for today list modal
+      // Fetch paid cuotas for today list modal and month count
       const paidCuotasSnap = await getDocs(query(
         collection(db, 'cuotas'),
         where('estado', '==', 'pagado')
@@ -104,13 +95,24 @@ export default function AdminDashboard() {
 
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
 
+      let pagadasCountHoy = 0;
+      let pagadasCountMes = 0;
       const cuotasHoyTemp: any[] = [];
+
       paidCuotasSnap.forEach(doc => {
         const data = doc.data();
         if (data.fecha_pago) {
           const fp = data.fecha_pago.toDate ? data.fecha_pago.toDate() : new Date(data.fecha_pago);
+          
+          if (fp >= monthStart && fp <= monthEnd) {
+            pagadasCountMes++;
+          }
+
           if (fp >= todayStart && fp <= todayEnd) {
+            pagadasCountHoy++;
             const alumna = alumnasSnap.docs.find(a => a.id === data.alumna_id)?.data();
             cuotasHoyTemp.push({
               id: doc.id,
@@ -121,6 +123,16 @@ export default function AdminDashboard() {
             });
           }
         }
+      });
+
+      setStats({
+        totalActivas: activas,
+        cuotasMesPagadas: pagadasCountMes,
+        cuotasHoyPagadas: pagadasCountHoy,
+        cuotasMesPendientesCount: unpaidCount,
+        cuotasMesPendientesAmt: unpaidAmt,
+        aptosPorVencer: aptosXVencer,
+        pendientesAprobacion: pendientesCount
       });
       cuotasHoyTemp.sort((a, b) => b.fechaPagoDate.getTime() - a.fechaPagoDate.getTime());
       setCuotasHoy(cuotasHoyTemp);
@@ -208,6 +220,89 @@ export default function AdminDashboard() {
     window.location.href = `mailto:${parentEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const handleExportarMes = async () => {
+    try {
+      const today = new Date();
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+      
+      const paidCuotasSnap = await getDocs(query(
+        collection(db, 'cuotas'),
+        where('estado', '==', 'pagado')
+      ));
+      
+      const alumnasSnap = await getDocs(collection(db, 'alumnas'));
+      const alumnasMap: Record<string, string> = {};
+      alumnasSnap.forEach(d => {
+         alumnasMap[d.id] = d.data().nombre_completo || 'Desconocida';
+      });
+
+      const pagosDelMes: any[] = [];
+      let totalEfectivo = 0;
+      let totalTransferencia = 0;
+      let totalDebito = 0;
+      let totalOtros = 0;
+      let countEfectivo = 0;
+      let countTransferencia = 0;
+      let countDebito = 0;
+      let countOtros = 0;
+
+      paidCuotasSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.fecha_pago) {
+          const fp = data.fecha_pago.toDate ? data.fecha_pago.toDate() : new Date(data.fecha_pago);
+          if (fp >= monthStart && fp <= monthEnd) {
+             const metodo = (data.metodo_pago || data.metodo || 'Efectivo').toLowerCase();
+             const monto = Number(data.monto) || 0;
+             
+             let metodoLabel = 'Efectivo';
+             if (metodo.includes('efectivo')) { totalEfectivo += monto; countEfectivo++; metodoLabel = 'Efectivo'; }
+             else if (metodo.includes('transferencia')) { totalTransferencia += monto; countTransferencia++; metodoLabel = 'Transferencia'; }
+             else if (metodo.includes('debito') || metodo.includes('débito') || metodo.includes('tarjeta')) { totalDebito += monto; countDebito++; metodoLabel = 'Tarjeta/Débito'; }
+             else { totalOtros += monto; countOtros++; metodoLabel = 'Otros'; }
+
+             pagosDelMes.push({
+               Gimnasta: alumnasMap[data.alumna_id] || 'Desconocida',
+               'Mes Abonado': `${data.mes}/${data.anio}`,
+               Monto: monto,
+               Metodo: metodoLabel,
+               'Fecha de Pago': format(fp, 'dd/MM/yyyy HH:mm')
+             });
+          }
+        }
+      });
+
+      if (pagosDelMes.length === 0) {
+         alert("No hay pagos registrados en este mes para exportar.");
+         return;
+      }
+
+      pagosDelMes.sort((a, b) => a.Gimnasta.localeCompare(b.Gimnasta));
+
+      pagosDelMes.push({});
+      pagosDelMes.push({ Gimnasta: 'RESUMEN DEL MES' });
+      pagosDelMes.push({ Gimnasta: 'Total Efectivo', Monto: totalEfectivo, Metodo: `${countEfectivo} pagos` });
+      pagosDelMes.push({ Gimnasta: 'Total Transferencia', Monto: totalTransferencia, Metodo: `${countTransferencia} pagos` });
+      pagosDelMes.push({ Gimnasta: 'Total Tarjeta/Débito', Monto: totalDebito, Metodo: `${countDebito} pagos` });
+      pagosDelMes.push({ Gimnasta: 'Total Otros', Monto: totalOtros, Metodo: `${countOtros} pagos` });
+      pagosDelMes.push({});
+      pagosDelMes.push({ 
+         Gimnasta: 'TOTAL RECAUDADO', 
+         Monto: totalEfectivo + totalTransferencia + totalDebito + totalOtros,
+         Metodo: `${countEfectivo + countTransferencia + countDebito + countOtros} pagos en total` 
+      });
+
+      const ws = XLSX.utils.json_to_sheet(pagosDelMes);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Resumen del Mes");
+      XLSX.writeFile(wb, `Resumen_Ingresos_Cuotas_${format(today, 'MM_yyyy')}.xlsx`);
+
+    } catch (e) {
+      console.error(e);
+      alert('Error al generar el Excel');
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* HEADER WITH REFRESH */}
@@ -216,13 +311,22 @@ export default function AdminDashboard() {
           <h1 className="text-xl lg:text-2xl font-black text-slate-800 uppercase tracking-tight">Panel de Control</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Resumen general y alertas del sistema</p>
         </div>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
-        >
-          <Calendar className="w-4 h-4" />
-          Actualizar Datos
-        </button>
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
+           <button 
+             onClick={handleExportarMes} 
+             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-700 transition-colors shadow-sm"
+           >
+             <Download className="w-4 h-4" />
+             Exportar Mes (Excel)
+           </button>
+           <button 
+             onClick={() => window.location.reload()} 
+             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+           >
+             <Calendar className="w-4 h-4" />
+             Actualizar Datos
+           </button>
+        </div>
       </div>
 
       {/* TARJETAS DE ESTADISTICAS */}
@@ -249,9 +353,9 @@ export default function AdminDashboard() {
           borderColor="border-l-amber-500"
         />
         <StatCard 
-          title="Cuotas Cobradas (Mes)"
-          value={stats.cuotasMesPagadas}
-          subtitle="Pagos del mes · Ver hoy ↗"
+          title="Cuotas Cobradas"
+          value={stats.cuotasHoyPagadas}
+          subtitle={`${stats.cuotasMesPagadas} en el mes · Ver hoy ↗`}
           subColor="text-emerald-600 font-bold"
           borderColor="border-l-emerald-500"
           valueColor="text-emerald-600"
