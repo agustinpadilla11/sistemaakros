@@ -4,6 +4,8 @@ import { db } from '../../firebase/config';
 import { Search, Filter, Plus, FileSpreadsheet, Edit, Trash2, CheckCircle, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export default function Alumnas() {
   const [alumnas, setAlumnas] = useState<any[]>([]);
@@ -165,6 +167,83 @@ export default function Alumnas() {
     XLSX.writeFile(workbook, `Bajas_Gimnastas_${new Date().getFullYear()}.xlsx`);
   };
 
+  const exportGimnastasExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Gimnastas');
+
+    worksheet.columns = [
+      { header: 'REGULARES', key: 'reg_nombre', width: 35 },
+      { header: '', key: 'gap1', width: 5 },
+      { header: 'ALTAS', key: 'alta_nombre', width: 35 },
+      { header: 'Mes Alta', key: 'alta_mes', width: 25 },
+      { header: '', key: 'gap2', width: 5 },
+      { header: 'BAJAS', key: 'baja_nombre', width: 35 },
+      { header: 'Mes Baja', key: 'baja_mes', width: 25 }
+    ];
+
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).alignment = { horizontal: 'center' };
+
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    const sortedAlumnas = [...alumnas].sort((a, b) => (a.nombre_completo || '').localeCompare(b.nombre_completo || ''));
+    
+    const regulares: any[] = [];
+    const altas: any[] = [];
+    const bajasList: any[] = [];
+
+    sortedAlumnas.forEach(a => {
+      if (a.estado === 'inactiva') {
+        let mesDetalle = '';
+        const baja = bajas.find(b => b.alumna_dni === a.dni || b.alumna_nombre === a.nombre_completo);
+        if (baja && baja.fecha) {
+          const bDate = baja.fecha.toDate ? baja.fecha.toDate() : new Date(baja.fecha);
+          mesDetalle = bDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+        }
+        bajasList.push({ nombre: a.nombre_completo, mes: mesDetalle });
+      } else if (a.estado === 'activa') {
+        const cDate = a.creado_en?.toDate ? a.creado_en.toDate() : (a.creado_en ? new Date(a.creado_en) : today);
+        if (cDate.getMonth() === currentMonth && cDate.getFullYear() === currentYear) {
+          altas.push({ nombre: a.nombre_completo, mes: cDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }) });
+        } else {
+          regulares.push({ nombre: a.nombre_completo });
+        }
+      }
+    });
+
+    const maxRows = Math.max(regulares.length, altas.length, bajasList.length);
+
+    for (let i = 0; i < maxRows; i++) {
+      const row = worksheet.addRow({
+        reg_nombre: regulares[i]?.nombre || '',
+        gap1: '',
+        alta_nombre: altas[i]?.nombre || '',
+        alta_mes: altas[i]?.mes || '',
+        gap2: '',
+        baja_nombre: bajasList[i]?.nombre || '',
+        baja_mes: bajasList[i]?.mes || ''
+      });
+
+      // Estilos para Altas (columnas C y D) - 1 indexado en exceljs -> 3 y 4
+      if (altas[i]) {
+        row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCFFCC' } };
+        row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCFFCC' } };
+      }
+      
+      // Estilos para Bajas (columnas F y G) - 1 indexado en exceljs -> 6 y 7
+      if (bajasList[i]) {
+        row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+        row.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+      }
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `Gimnastas_Completas.xlsx`);
+  };
+
   return (
     <div className="space-y-8">
       {/* HEADER */}
@@ -179,6 +258,12 @@ export default function Alumnas() {
               <Download className="w-3.5 h-3.5" /> Exportar Bajas
             </button>
           )}
+          <button 
+            onClick={exportGimnastasExcel}
+            className="flex-1 lg:flex-none text-center bg-blue-50 text-blue-700 px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-blue-100 transition-colors border border-blue-200 whitespace-nowrap flex items-center justify-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" /> Exportar Excel
+          </button>
           <Link to="/admin/alumnas/importar-docs" className="flex-1 lg:flex-none text-center bg-emerald-50 text-emerald-700 px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-100 transition-colors border border-emerald-200 whitespace-nowrap">
             Importar Docs
           </Link>

@@ -357,7 +357,10 @@ export default function CajaDiaria() {
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Efectivo</p>
-               <p className="text-2xl font-black text-emerald-400 relative z-10">{formatter.format(cajaFinalEfvo)}</p>
+               <p className="text-2xl font-black text-emerald-400 relative z-10">
+                 {formatter.format(arqueoData ? arqueoData.real : cajaFinalEfvo)}
+                 {arqueoData && <span className="text-[10px] text-emerald-600 ml-2 bg-emerald-100 px-1.5 py-0.5 rounded">Arqueado</span>}
+               </p>
             </div>
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
@@ -371,7 +374,9 @@ export default function CajaDiaria() {
             </div>
             <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg border border-slate-700 flex flex-col justify-center relative overflow-hidden">
                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Total Consolidado</p>
-               <p className="text-3xl font-black text-white relative z-10">{formatter.format(totalFinalTodo)}</p>
+               <p className="text-3xl font-black text-white relative z-10">
+                 {formatter.format((arqueoData ? arqueoData.real : cajaFinalEfvo) + cajaFinalDebito + cajaFinalTransf)}
+               </p>
             </div>
           </div>
 

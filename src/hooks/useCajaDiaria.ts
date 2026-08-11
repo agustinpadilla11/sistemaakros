@@ -161,6 +161,7 @@ export function useCajaDiaria() {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + days);
     setCurrentDate(d);
+    setCurrentMonthDate(new Date(d));
   };
 
   const changeMonth = (months: number) => {
