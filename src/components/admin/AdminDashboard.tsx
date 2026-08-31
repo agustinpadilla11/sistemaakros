@@ -246,6 +246,7 @@ export default function AdminDashboard() {
       let countTransferencia = 0;
       let countDebito = 0;
       let countOtros = 0;
+      const NOMBRES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
       paidCuotasSnap.forEach(doc => {
         const data = doc.data();
@@ -263,7 +264,7 @@ export default function AdminDashboard() {
 
              pagosDelMes.push({
                Gimnasta: alumnasMap[data.alumna_id] || 'Desconocida',
-               'Mes Abonado': `${data.mes}/${data.anio}`,
+               'Mes Abonado': `${NOMBRES_MESES[data.mes - 1] || data.mes} ${data.anio}`,
                Monto: monto,
                Metodo: metodoLabel,
                'Fecha de Pago': format(fp, 'dd/MM/yyyy HH:mm')
@@ -279,18 +280,23 @@ export default function AdminDashboard() {
 
       pagosDelMes.sort((a, b) => a.Gimnasta.localeCompare(b.Gimnasta));
 
+      const formatCurrency = (val: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+
       pagosDelMes.push({});
-      pagosDelMes.push({ Gimnasta: 'RESUMEN DEL MES' });
-      pagosDelMes.push({ Gimnasta: 'Total Efectivo', Monto: totalEfectivo, Metodo: `${countEfectivo} pagos` });
-      pagosDelMes.push({ Gimnasta: 'Total Transferencia', Monto: totalTransferencia, Metodo: `${countTransferencia} pagos` });
-      pagosDelMes.push({ Gimnasta: 'Total Tarjeta/Débito', Monto: totalDebito, Metodo: `${countDebito} pagos` });
-      pagosDelMes.push({ Gimnasta: 'Total Otros', Monto: totalOtros, Metodo: `${countOtros} pagos` });
-      pagosDelMes.push({});
+      pagosDelMes.push({ Gimnasta: '================================' });
+      pagosDelMes.push({ Gimnasta: '📊 RESUMEN DEL MES', Monto: '', Metodo: '' });
+      pagosDelMes.push({ Gimnasta: '================================' });
+      pagosDelMes.push({ Gimnasta: '💵 Total Efectivo', Monto: formatCurrency(totalEfectivo), Metodo: `${countEfectivo} pagos` });
+      pagosDelMes.push({ Gimnasta: '🏦 Total Transferencia', Monto: formatCurrency(totalTransferencia), Metodo: `${countTransferencia} pagos` });
+      pagosDelMes.push({ Gimnasta: '💳 Total Tarjeta/Débito', Monto: formatCurrency(totalDebito), Metodo: `${countDebito} pagos` });
+      pagosDelMes.push({ Gimnasta: '❓ Total Otros', Monto: formatCurrency(totalOtros), Metodo: `${countOtros} pagos` });
+      pagosDelMes.push({ Gimnasta: '--------------------------------' });
       pagosDelMes.push({ 
-         Gimnasta: 'TOTAL RECAUDADO', 
-         Monto: totalEfectivo + totalTransferencia + totalDebito + totalOtros,
+         Gimnasta: '💰 TOTAL RECAUDADO', 
+         Monto: formatCurrency(totalEfectivo + totalTransferencia + totalDebito + totalOtros),
          Metodo: `${countEfectivo + countTransferencia + countDebito + countOtros} pagos en total` 
       });
+      pagosDelMes.push({ Gimnasta: '================================' });
 
       const ws = XLSX.utils.json_to_sheet(pagosDelMes);
       const wb = XLSX.utils.book_new();

@@ -35,6 +35,7 @@ export default function Cuotas() {
   const [searchTermGlobal, setSearchTermGlobal] = useState('');
   const [selectedHistoryAlumna, setSelectedHistoryAlumna] = useState<any>(null);
   const [isDeudorasOpen, setIsDeudorasOpen] = useState(false);
+  const [deudorasMesFiltro, setDeudorasMesFiltro] = useState<number | 'todos'>('todos');
 
   const today = new Date();
 
@@ -61,12 +62,18 @@ export default function Cuotas() {
     alumnas.filter(a => a.estado !== 'inactiva').forEach(alu => {
       const aluCuotas = cuotas[alu.id] || [];
       const mesesAdeudados: string[] = [];
-      
-      // Empezamos desde Junio (mes 6) según lo solicitado, ignorando Mayo
-      for (let i = 6; i <= maxMonth; i++) {
-        const c = aluCuotas.find(x => x.mes === i);
+      if (deudorasMesFiltro !== 'todos') {
+        const c = aluCuotas.find(x => x.mes === deudorasMesFiltro);
         if (!c || c.estado !== 'pagado') {
-          mesesAdeudados.push(MESES[i - 1]);
+          mesesAdeudados.push(MESES[deudorasMesFiltro - 1]);
+        }
+      } else {
+        // Empezamos desde Junio (mes 6) según lo solicitado, ignorando Mayo
+        for (let i = 6; i <= maxMonth; i++) {
+          const c = aluCuotas.find(x => x.mes === i);
+          if (!c || c.estado !== 'pagado') {
+            mesesAdeudados.push(MESES[i - 1]);
+          }
         }
       }
 
@@ -662,9 +669,21 @@ export default function Cuotas() {
                    <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Gimnastas con Deuda</h2>
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cuotas pendientes hasta el mes actual ({yearFil})</p>
                 </div>
-                <button onClick={() => setIsDeudorasOpen(false)} className="text-slate-300 hover:text-slate-600 transition-colors">
-                   <XCircle className="w-8 h-8"/>
-                </button>
+                <div className="flex items-center gap-4">
+                   <select
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+                      value={deudorasMesFiltro}
+                      onChange={(e) => setDeudorasMesFiltro(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
+                   >
+                      <option value="todos">Todos los meses</option>
+                      {MESES.map((m, i) => (
+                         <option key={i} value={i + 1}>{m}</option>
+                      ))}
+                   </select>
+                   <button onClick={() => setIsDeudorasOpen(false)} className="text-slate-300 hover:text-slate-600 transition-colors">
+                      <XCircle className="w-8 h-8"/>
+                   </button>
+                </div>
              </div>
              
              <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
