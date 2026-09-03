@@ -523,7 +523,11 @@ export default function CajaDiaria() {
                             return (
                               <tr key={`o-${o.id}`} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3">
-                                   <span className="block text-xs font-black text-slate-700">{o.concepto}</span>
+                                   <span className="block text-xs font-black text-slate-700">
+                                     {o.alumna_id && alumnas.find(a => a.id === o.alumna_id)?.nombre_completo 
+                                       ? `${o.concepto} - ${alumnas.find(a => a.id === o.alumna_id)?.nombre_completo}`
+                                       : o.concepto}
+                                   </span>
                                    <span className="block text-[10px] font-bold text-orange-600 uppercase tracking-widest mt-0.5 bg-orange-50 inline-block px-1.5 rounded">Otros Ingresos</span>
                                 </td>
                                 <td className="px-4 py-3">

@@ -114,11 +114,16 @@ export default function Grupos() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        nombre: form.nombre,
+        horario: form.horario,
+        descripcion: form.descripcion || ''
+      };
       if (isEditing === 'nuevo') {
         const newRef = doc(collection(db, 'grupos'));
-        await setDoc(newRef, { ...form });
+        await setDoc(newRef, payload);
       } else {
-        await updateDoc(doc(db, 'grupos', isEditing.id), { ...form });
+        await updateDoc(doc(db, 'grupos', isEditing.id), payload);
       }
       setIsEditing(null);
       loadData();
@@ -500,7 +505,7 @@ export default function Grupos() {
               <div key={g.id} className="bg-white flex flex-col p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-purple-300 transition-all group">
                 <div className="flex justify-between items-start">
                   <h3 className="text-sm font-black uppercase tracking-tight px-3 py-1 rounded bg-purple-50 text-purple-900">{g.nombre}</h3>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-2 transition-opacity">
                     <button onClick={() => handleVaciarGrupo(g.id)} title="Vaciar Grupo" className="text-slate-400 hover:text-amber-600 transition-colors">
                        <UserMinus className="w-4 h-4" />
                     </button>
