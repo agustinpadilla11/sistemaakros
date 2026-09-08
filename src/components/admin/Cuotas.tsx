@@ -10,6 +10,8 @@ export default function Cuotas() {
   const [alumnas, setAlumnas] = useState<any[]>([]);
   const [grupos, setGrupos] = useState<any[]>([]);
   const [cuotas, setCuotas] = useState<Record<string, any[]>>({}); // Record<alumnaId, Cuota[]>
+  const [matriculas, setMatriculas] = useState<any[]>([]);
+  const [seguros, setSeguros] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +122,24 @@ export default function Cuotas() {
         cuotasMap[c.alumna_id].push(c);
       });
       setCuotas(cuotasMap);
+
+      // Fetch matriculas and seguros for the current year
+      const yearStart = new Date(yearFil, 0, 1);
+      const yearEnd = new Date(yearFil, 11, 31, 23, 59, 59, 999);
+      
+      const mSnap = await getDocs(collection(db, 'matriculas'));
+      const matDocs = mSnap.docs.map(d => d.data()).filter(d => {
+        const t = d.fecha?.toDate ? d.fecha.toDate() : new Date(d.fecha);
+        return t >= yearStart && t <= yearEnd;
+      });
+      setMatriculas(matDocs);
+
+      const sSnap = await getDocs(collection(db, 'seguros'));
+      const segDocs = sSnap.docs.map(d => d.data()).filter(d => {
+        const t = d.fecha?.toDate ? d.fecha.toDate() : new Date(d.fecha);
+        return t >= yearStart && t <= yearEnd;
+      });
+      setSeguros(segDocs);
     } catch (err) {
       console.error(err);
     } finally {
@@ -327,6 +347,14 @@ export default function Cuotas() {
     }
   };
 
+  const currentMonth = today.getMonth() + 1;
+  const [verTodo, setVerTodo] = useState(false);
+  const is2027Onwards = yearFil >= 2027;
+
+  const visibleMonths = verTodo 
+      ? [1,2,3,4,5,6,7,8,9,10,11,12]
+      : [currentMonth - 2, currentMonth - 1, currentMonth].filter(x => x >= 1);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
@@ -375,7 +403,12 @@ export default function Cuotas() {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h3 className="text-[10px] lg:text-sm font-bold uppercase tracking-tight shrink-0">Pagos del Año</h3>
+          <div className="flex items-center gap-3">
+             <h3 className="text-[10px] lg:text-sm font-bold uppercase tracking-tight shrink-0">Pagos del Año</h3>
+             <button onClick={() => setVerTodo(!verTodo)} className="text-[9px] font-black uppercase tracking-widest bg-slate-200 px-2 py-1 rounded hover:bg-slate-300 transition-colors">
+                {verTodo ? 'Ver Últimos 3 Meses' : 'Ver Todos los Meses'}
+             </button>
+          </div>
           <div className="w-full sm:max-w-sm relative">
              <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
              <input 
@@ -388,15 +421,24 @@ export default function Cuotas() {
           </div>
         </div>
         <div className="overflow-auto max-h-[65vh]">
-          <table className="w-full text-left bg-white relative">
+          <table className="w-full text-left bg-white relative" style={{ minWidth: is2027Onwards ? '1000px' : 'auto' }}>
             <thead className="sticky top-0 z-20 shadow-sm">
               <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-b border-slate-100">
                 <th className="p-4 font-black sticky left-0 top-0 bg-slate-50 border-r border-slate-100 z-30 w-48 shadow-sm">Gimnasta</th>
-                {MESES.map((m, i) => (
-                  <th key={m} className={`p-3 font-black text-center w-16 sticky top-0 ${(today.getMonth() === i && yearFil === today.getFullYear()) ? 'bg-purple-100 text-purple-700' : 'bg-slate-50'} z-20 shadow-sm`}>
-                    {m}
-                  </th>
-                ))}
+                {is2027Onwards && (
+                  <>
+                    <th className="p-3 font-black text-center w-24 sticky left-[192px] top-0 bg-slate-50 border-r border-slate-100 z-30 shadow-sm">Matrícula</th>
+                    <th className="p-3 font-black text-center w-24 sticky left-[288px] top-0 bg-slate-50 border-r border-slate-100 z-30 shadow-sm">Seguro</th>
+                  </>
+                )}
+                {visibleMonths.map((mesIndex) => {
+                  const m = MESES[mesIndex - 1];
+                  return (
+                    <th key={m} className={`p-3 font-black text-center w-16 sticky top-0 ${(today.getMonth() === mesIndex - 1 && yearFil === today.getFullYear()) ? 'bg-purple-100 text-purple-700' : 'bg-slate-50'} z-20 shadow-sm`}>
+                      {m}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

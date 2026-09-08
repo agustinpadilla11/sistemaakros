@@ -19,7 +19,7 @@ export default function CajaDiaria() {
     handlePOSCuota, handlePOSMerch, handlePOSOtro,
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
-    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, toast,
+    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, clearArqueo, toast,
     deleteEgreso, deleteIngreso,
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy, allDayItems,
@@ -166,9 +166,10 @@ export default function CajaDiaria() {
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
                       <select required value={cuotaForm.metodo_pago} onChange={e=>setCuotaForm({...cuotaForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
-                         <option value="efectivo">EFVO</option>
+                         <option value="efectivo">Efectivo</option>
                          <option value="debito">Débito</option>
-                         <option value="transferencia">Transferencia</option>
+                         <option value="transf cta pato">Transf Cta Pato</option>
+                         <option value="transf cta ak">Transf Cta AK</option>
                       </select>
                     </div>
                     <div>
@@ -190,61 +191,22 @@ export default function CajaDiaria() {
                    }} 
                    className="grid grid-cols-6 gap-3 items-end"
                  >
-                    <div className="col-span-2 relative">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Producto</label>
-                      <input 
-                        ref={merchSearchInputRef}
-                        list="productos-list"
-                        type="text" 
-                        required 
-                        value={searchMerch}
-                        autoComplete="off"
-                        onChange={e => {
-                          const val = e.target.value;
-                          setSearchMerch(val);
-                          const matched = productos.find(p => 
-                            p.nombre.trim().toLowerCase() === val.trim().toLowerCase()
-                          );
-                          setMerchForm({
-                            ...merchForm, 
-                            producto_id: matched ? matched.id : '',
-                            monto: matched ? (matched.precio * merchForm.cantidad).toString() : merchForm.monto
-                          });
-                        }}
-                        placeholder="Ej: Turrón..."
-                        className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" 
-                      />
-                      <datalist id="productos-list">
-                        {productos.map(p => (
-                          <option key={p.id} value={p.nombre} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unidades</label>
-                      <input type="number" required min="1" value={merchForm.cantidad} onChange={e=>{
-                        const nuevaCantidad = Number(e.target.value);
-                        const prod = productos.find(p => p.id === merchForm.producto_id);
-                        const nuevoMonto = prod ? (prod.precio * nuevaCantidad).toString() : merchForm.monto;
-                        setMerchForm({...merchForm, cantidad: nuevaCantidad, monto: nuevoMonto});
-                      }} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" />
-                    </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Monto ($)</label>
                       <input type="number" required value={merchForm.monto} onChange={e=>setMerchForm({...merchForm, monto: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white" placeholder="Ej: 500" />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Método</label>
                       <select required value={merchForm.metodo_pago} onChange={e=>setMerchForm({...merchForm, metodo_pago: e.target.value})} className="w-full text-xs font-bold p-2.5 rounded border border-purple-200 outline-none focus:border-purple-500 uppercase bg-white">
-                         <option value="efectivo">EFVO</option>
+                         <option value="efectivo">Efectivo</option>
                          <option value="debito">Débito</option>
                          <option value="transferencia">Transferencia</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <button 
                         type="submit" 
-                        disabled={isProcessing || !searchMerch || !merchForm.monto} 
+                        disabled={isProcessing || !merchForm.monto} 
                         className="w-full bg-emerald-600 text-white rounded p-2.5 font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm active:scale-95 disabled:opacity-50"
                       >
                          {isProcessing ? 'Procesando...' : 'Vender'}
@@ -446,7 +408,7 @@ export default function CajaDiaria() {
                   // Display real saved numbers after Arqueo
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Efectivo Real Contado:</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Total Efectivo Contado:</span>
                       <span className="text-sm font-black text-slate-800">{formatter.format(arqueoData.real)}</span>
                     </div>
 
@@ -465,16 +427,24 @@ export default function CajaDiaria() {
                       </div>
                     </div>
 
-                    <button 
-                      onClick={() => {
-                        setEfectivoReal(arqueoData.real.toString());
-                        setEntregadoDuena((arqueoData.entregado_duena || 0).toString());
-                        setShowArqueo(true);
-                      }}
-                      className="w-full text-center text-[9px] font-black uppercase text-purple-600 hover:text-purple-800 underline tracking-widest mt-1 block"
-                    >
-                      Volver a Arquear / Corregir
-                    </button>
+                    <div className="flex flex-col gap-2 mt-2">
+                      <button 
+                        onClick={() => {
+                          setEfectivoReal(arqueoData.real.toString());
+                          setEntregadoDuena((arqueoData.entregado_duena || 0).toString());
+                          setShowArqueo(true);
+                        }}
+                        className="w-full text-center text-[9px] font-black uppercase text-purple-600 hover:text-purple-800 underline tracking-widest block"
+                      >
+                        Volver a Arquear / Corregir
+                      </button>
+                      <button 
+                        onClick={clearArqueo}
+                        className="w-full text-center text-[9px] font-black uppercase text-red-500 hover:text-red-700 underline tracking-widest block"
+                      >
+                        Limpiar Arqueo
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -548,11 +518,11 @@ export default function CajaDiaria() {
                                    <span className="block text-xs font-black text-slate-700">
                                      {m.tipo === 'merch' 
                                        ? `${m.concepto} ${m.talle ? `(Talle ${m.talle})` : ''} - ${m.alumna_nombre}` 
-                                       : `${m.nombre_producto} (x${m.cantidad})`}
+                                       : `${m.nombre_producto}`}
                                    </span>
                                    <span className="block text-[10px] font-bold text-teal-600 uppercase tracking-widest mt-0.5 bg-teal-50 inline-block px-1.5 rounded">
-                                     {m.tipo === 'merch' ? 'Indumentaria' : 'Kiosko'}
-                                   </span>
+                                      Kiosko
+                                    </span>
                                 </td>
                                 <td className="px-4 py-3">
                                   <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo_pago || m.metodo || 'efectivo'}</span>
@@ -807,7 +777,7 @@ export default function CajaDiaria() {
              </div>
              <form onSubmit={handleArqueo} className="space-y-4">
                 <div>
-                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Efectivo Real Contado ($)</label>
+                   <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Total Efectivo Contado (Dueña + Caja) ($)</label>
                    <input type="number" required value={efectivoReal} onChange={e=>setEfectivoReal(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded text-xs font-bold outline-none focus:border-purple-500" />
                 </div>
                 <div>

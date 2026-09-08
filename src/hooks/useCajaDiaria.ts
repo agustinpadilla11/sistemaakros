@@ -14,7 +14,7 @@ const isEfectivo = (item: Record<string, any>) => getMetodo(item) === 'efectivo'
 const isDebito = (item: Record<string, any>) => getMetodo(item) === 'debito';
 const isTransf = (item: Record<string, any>) => {
   const m = getMetodo(item);
-  return m === 'transferencia' || m === 'mp' || m === 'mercado pago' || m === 'mercado_pago';
+  return m === 'transferencia' || m === 'mp' || m === 'mercado pago' || m === 'mercado_pago' || m === 'transf cta pato' || m === 'transf cta ak';
 };
 
 const sumMonto = (items: Record<string, any>[]) => items.reduce((a, b) => a + (b.monto || 0), 0);
@@ -87,60 +87,129 @@ export function useCajaDiaria() {
     try {
       const monthPrefix = `${currentDate.getFullYear()}-${(currentDate.getMonth()+1).toString().padStart(2, '0')}`;
       const cajaSnap = await getDocs(query(collection(db, 'cajas')));
-      const cajaDoc = cajaSnap.docs.find(d => d.id === dateStr);
-      setComienzoCaja(cajaDoc ? cajaDoc.data().monto : 0);
-
+      
       const cuotasSnap = await getDocs(query(collection(db, 'cuotas'), where('estado', '==', 'pagado')));
+      const otrosSnap = await getDocs(query(collection(db, 'otros_costos'), where('estado', '==', 'pagado')));
+      const ventasSnap = await getDocs(collection(db, 'ventas_merch'));
+      const egresosSnap = await getDocs(collection(db, 'egresos'));
+      const arqueoSnap = await getDocs(collection(db, 'arqueos'));
+      const licSnap = await getDocs(collection(db, 'federacion_licencias'));
+      const insSnap = await getDocs(collection(db, 'federacion_inscripciones'));
+      const matSnap = await getDocs(collection(db, 'matriculas'));
+      const segSnap = await getDocs(collection(db, 'seguros'));
+      const torSnap = await getDocs(collection(db, 'torneos_pagos'));
+
+      // Helper to sum for a specific date
+      const getEfvoForDate = (dStr: string) => {
+         const yDate = new Date(dStr + "T12:00:00");
+         const yStart = new Date(yDate); yStart.setHours(0,0,0,0);
+         const yEnd = new Date(yDate); yEnd.setHours(23,59,59,999);
+         
+         const isY = (d: any) => {
+            if (!d) return false;
+            const t = d.toDate ? d.toDate() : new Date(d);
+            return t >= yStart && t <= yEnd;
+         };
+         
+         let sumIn = 0;
+         cuotasSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha_pago) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         otrosSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         ventasSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         licSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         insSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         matSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         segSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         torSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         
+         let sumOut = 0;
+         egresosSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumOut += (d.monto||0));
+         
+         return { sumIn, sumOut };
+      };
+
+      const allCajasMap = cajaSnap.docs.reduce((acc: any, d) => ({...acc, [d.id]: d.data().monto}), {});
+      const allArqueosMap = arqueoSnap.docs.reduce((acc: any, d) => ({...acc, [d.id]: d.data().entregado_duena || 0}), {});
+
+      let currentCheckDate = new Date(currentDate);
+      let foundManual = false;
+      let calculatedBalance = 0;
+      let daysBack = 0;
+
+      // Iteramos hacia atrás buscando la última caja manual (max 30 días)
+      const balancesToAdd: any[] = [];
+      while (daysBack < 30) {
+        const checkStr = currentCheckDate.toISOString().split('T')[0];
+        
+        if (allCajasMap[checkStr] !== undefined) {
+           calculatedBalance = allCajasMap[checkStr];
+           foundManual = true;
+           break;
+        } else {
+           balancesToAdd.unshift(checkStr); // Agregamos al principio para calcular en orden
+        }
+        
+        currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+        daysBack++;
+      }
+
+      if (foundManual && balancesToAdd.length > 0) {
+        // Calcular el saldo progresivamente hasta hoy
+        for (const bStr of balancesToAdd) {
+           if (bStr === dateStr) break; // No sumamos los de hoy porque esos forman parte del día
+           const prevStr = new Date(new Date(bStr + "T12:00:00").getTime() - 86400000).toISOString().split('T')[0];
+           const { sumIn, sumOut } = getEfvoForDate(prevStr);
+           const entregado = allArqueosMap[prevStr] || 0;
+           calculatedBalance = calculatedBalance + sumIn - sumOut - entregado;
+        }
+        // Si hoy no tiene caja manual, será el balance calculado
+        if (allCajasMap[dateStr] === undefined) {
+           const yStr = new Date(currentDate.getTime() - 86400000).toISOString().split('T')[0];
+           const { sumIn, sumOut } = getEfvoForDate(yStr);
+           const entregado = allArqueosMap[yStr] || 0;
+           setComienzoCaja(calculatedBalance + sumIn - sumOut - entregado);
+        } else {
+           setComienzoCaja(allCajasMap[dateStr]);
+        }
+      } else {
+        setComienzoCaja(allCajasMap[dateStr] || 0);
+      }
+
       setCuotas(cuotasSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
         .filter((c: any) => {
           const d = toDate(c.fecha_pago);
           return d >= startOfMonth && d <= endOfMonth;
         }));
 
-      const otrosSnap = await getDocs(query(collection(db, 'otros_costos'), where('estado', '==', 'pagado')));
       setOtrosCostos(otrosSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
         .filter((c: any) => {
           const d = toDate(c.fecha);
           return d >= startOfMonth && d <= endOfMonth;
         }));
 
-      const ventasSnap = await getDocs(collection(db, 'ventas_merch'));
       setVentasMerch(ventasSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
         .filter((v: any) => {
           const d = toDate(v.fecha);
           return d >= startOfMonth && d <= endOfMonth;
         }));
 
-      const egresosSnap = await getDocs(collection(db, 'egresos'));
       setEgresos(egresosSnap.docs.map(d => ({id: d.id, ...d.data()} as any))
         .filter((e: any) => {
           const d = toDate(e.fecha);
           return d >= startOfMonth && d <= endOfMonth;
         }));
 
-      const arqueoSnap = await getDocs(collection(db, 'arqueos'));
       const dayArqueo = arqueoSnap.docs.find(d => d.id === dateStr);
       setArqueoData(dayArqueo ? dayArqueo.data() as ArqueoData : null);
 
-      // Fetch module-specific income
       const filterByMonth = (docs: any[]) => docs.filter((x: any) => {
         const d = toDate(x.fecha);
         return d >= startOfMonth && d <= endOfMonth;
       });
 
-      const licSnap = await getDocs(collection(db, 'federacion_licencias'));
       setLicencias(filterByMonth(licSnap.docs.map(d => ({id: d.id, ...d.data()}))));
-
-      const insSnap = await getDocs(collection(db, 'federacion_inscripciones'));
       setInscripcionesFed(filterByMonth(insSnap.docs.map(d => ({id: d.id, ...d.data()}))));
-
-      const matSnap = await getDocs(collection(db, 'matriculas'));
       setMatriculas(filterByMonth(matSnap.docs.map(d => ({id: d.id, ...d.data()}))));
-
-      const segSnap = await getDocs(collection(db, 'seguros'));
       setSeguros(filterByMonth(segSnap.docs.map(d => ({id: d.id, ...d.data()}))));
-
-      const torSnap = await getDocs(collection(db, 'torneos_pagos'));
       setTorneosPagos(filterByMonth(torSnap.docs.map(d => ({id: d.id, ...d.data()}))));
 
       const alSnap = await getDocs(collection(db, 'alumnas'));
@@ -248,29 +317,11 @@ export function useCajaDiaria() {
   const handlePOSMerch = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    const { producto_id, cantidad, metodo_pago, monto } = merchForm;
+    const { metodo_pago, monto } = merchForm;
     
-    if (!searchMerch) {
-      alert('Por favor, selecciona o escribe un producto.');
-      return;
-    }
-    if (!cantidad || cantidad <= 0) {
-      alert('La cantidad debe ser mayor a 0.');
-      return;
-    }
-
     setIsProcessing(true);
     try {
-      const prod = productos.find(p => p.id === producto_id);
-      
-      if (prod && prod.stock < cantidad) {
-        if (!confirm(`Stock insuficiente (${prod.stock}). ¿Deseas continuar con la venta de todos modos?`)) {
-          setIsProcessing(false);
-          return;
-        }
-      }
-
-      const total = Number(monto) > 0 ? Number(monto) : (prod ? Number(prod.precio) * cantidad : 0);
+      const total = Number(monto);
       if (total <= 0) {
         alert('Por favor, ingresa un monto válido.');
         setIsProcessing(false);
@@ -281,25 +332,16 @@ export function useCajaDiaria() {
       
       await setDoc(ventaRef, {
         id: ventaRef.id,
-        producto_id: prod ? prod.id : '',
-        nombre_producto: prod ? prod.nombre : searchMerch.toUpperCase(),
-        cantidad,
+        nombre_producto: 'VENTA KIOSKO',
         monto: total,
         metodo_pago,
         fecha: serverTimestamp(),
         tipo: 'kiosko',
-        creado_el: serverTimestamp()
+        creado_el: serverTimestamp(),
+        actualizado_el: serverTimestamp()
       });
 
-      // Update stock only if product exists in database
-      if (prod) {
-        await updateDoc(doc(db, 'productos', prod.id), {
-          stock: increment(-cantidad)
-        });
-      }
-
       setMerchForm({ producto_id: '', cantidad: 1, monto: '', metodo_pago: 'efectivo' });
-      setSearchMerch('');
       await loadData();
       showToast('Venta cargada con éxito');
     } catch (err) {
@@ -321,9 +363,9 @@ export function useCajaDiaria() {
         ? parseFloat(monto.replace(',', '.'))
         : Number(monto);
 
-      const newRef = doc(collection(db, 'otros_costos'));
-      await setDoc(newRef, {
-        id: newRef.id,
+      const lowerConcepto = concepto.toLowerCase();
+      let collectionName = 'otros_costos';
+      let docData: any = {
         alumna_id,
         concepto: concepto.toUpperCase(),
         monto: parsedMonto || 0,
@@ -331,6 +373,32 @@ export function useCajaDiaria() {
         metodo_pago,
         fecha: serverTimestamp(),
         notas: 'Ingreso rápido desde Mostrador'
+      };
+
+      if (lowerConcepto.includes('matricula') || lowerConcepto.includes('matrícula')) {
+        collectionName = 'matriculas';
+        const alu = alumnas.find(a => a.id === alumna_id);
+        docData = {
+          alumna_nombre: alu ? alu.nombre_completo : '',
+          monto: parsedMonto || 0,
+          fecha: serverTimestamp(),
+          metodo: metodo_pago,
+        };
+      } else if (lowerConcepto.includes('seguro')) {
+        collectionName = 'seguros';
+        const alu = alumnas.find(a => a.id === alumna_id);
+        docData = {
+          alumna_nombre: alu ? alu.nombre_completo : '',
+          monto: parsedMonto || 0,
+          fecha: serverTimestamp(),
+          metodo: metodo_pago,
+        };
+      }
+
+      const newRef = doc(collection(db, collectionName));
+      await setDoc(newRef, {
+        id: newRef.id,
+        ...docData
       });
       
       setOtroForm({ alumna_id: '', concepto: '', monto: '', metodo_pago: 'efectivo' });
@@ -435,6 +503,20 @@ export function useCajaDiaria() {
     } catch (err) {
       console.error(err);
       alert('Error al guardar arqueo');
+    }
+  };
+
+  const clearArqueo = async () => {
+    if (!window.confirm('¿Seguro que deseas eliminar el arqueo actual?')) return;
+    try {
+      await deleteDoc(doc(db, 'arqueos', dateStr));
+      setArqueoData(null);
+      setEfectivoReal('');
+      setEntregadoDuena('');
+      showToast('Arqueo eliminado con éxito');
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar arqueo');
     }
   };
 
@@ -626,7 +708,7 @@ export function useCajaDiaria() {
     // Egreso / Caja / Arqueo
     showEgreso, setShowEgreso, egresoForm, setEgresoForm, handleSaveEgreso,
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
-    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, toast,
+    showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, clearArqueo, toast,
     deleteEgreso, deleteIngreso,
     // Daily calcs
     cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
