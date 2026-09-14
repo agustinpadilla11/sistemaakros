@@ -240,10 +240,14 @@ export default function AdminDashboard() {
       const pagosDelMes: any[] = [];
       let totalEfectivo = 0;
       let totalTransferencia = 0;
+      let totalTransfPato = 0;
+      let totalTransfAk = 0;
       let totalDebito = 0;
       let totalOtros = 0;
       let countEfectivo = 0;
       let countTransferencia = 0;
+      let countTransfPato = 0;
+      let countTransfAk = 0;
       let countDebito = 0;
       let countOtros = 0;
       const NOMBRES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -258,7 +262,9 @@ export default function AdminDashboard() {
              
              let metodoLabel = 'Efectivo';
              if (metodo.includes('efectivo')) { totalEfectivo += monto; countEfectivo++; metodoLabel = 'Efectivo'; }
-             else if (metodo.includes('transferencia')) { totalTransferencia += monto; countTransferencia++; metodoLabel = 'Transferencia'; }
+             else if (metodo.includes('transf cta pato')) { totalTransfPato += monto; countTransfPato++; metodoLabel = 'Transf Cta Pato'; }
+             else if (metodo.includes('transf cta ak')) { totalTransfAk += monto; countTransfAk++; metodoLabel = 'Transf Cta AK'; }
+             else if (metodo.includes('transferencia') || metodo.includes('mp') || metodo.includes('mercado pago') || metodo.includes('mercado_pago')) { totalTransferencia += monto; countTransferencia++; metodoLabel = 'Transferencia/MP'; }
              else if (metodo.includes('debito') || metodo.includes('débito') || metodo.includes('tarjeta')) { totalDebito += monto; countDebito++; metodoLabel = 'Tarjeta/Débito'; }
              else { totalOtros += monto; countOtros++; metodoLabel = 'Otros'; }
 
@@ -287,14 +293,16 @@ export default function AdminDashboard() {
       pagosDelMes.push({ Gimnasta: '📊 RESUMEN DEL MES', Monto: '', Metodo: '' });
       pagosDelMes.push({ Gimnasta: '================================' });
       pagosDelMes.push({ Gimnasta: '💵 Total Efectivo', Monto: formatCurrency(totalEfectivo), Metodo: `${countEfectivo} pagos` });
-      pagosDelMes.push({ Gimnasta: '🏦 Total Transferencia', Monto: formatCurrency(totalTransferencia), Metodo: `${countTransferencia} pagos` });
+      pagosDelMes.push({ Gimnasta: '🏦 Total Transferencia/MP', Monto: formatCurrency(totalTransferencia), Metodo: `${countTransferencia} pagos` });
+      pagosDelMes.push({ Gimnasta: '🏦 Total Transf Cta Pato', Monto: formatCurrency(totalTransfPato), Metodo: `${countTransfPato} pagos` });
+      pagosDelMes.push({ Gimnasta: '🏦 Total Transf Cta AK', Monto: formatCurrency(totalTransfAk), Metodo: `${countTransfAk} pagos` });
       pagosDelMes.push({ Gimnasta: '💳 Total Tarjeta/Débito', Monto: formatCurrency(totalDebito), Metodo: `${countDebito} pagos` });
       pagosDelMes.push({ Gimnasta: '❓ Total Otros', Monto: formatCurrency(totalOtros), Metodo: `${countOtros} pagos` });
       pagosDelMes.push({ Gimnasta: '--------------------------------' });
       pagosDelMes.push({ 
          Gimnasta: '💰 TOTAL RECAUDADO', 
-         Monto: formatCurrency(totalEfectivo + totalTransferencia + totalDebito + totalOtros),
-         Metodo: `${countEfectivo + countTransferencia + countDebito + countOtros} pagos en total` 
+         Monto: formatCurrency(totalEfectivo + totalTransferencia + totalTransfPato + totalTransfAk + totalDebito + totalOtros),
+         Metodo: `${countEfectivo + countTransferencia + countTransfPato + countTransfAk + countDebito + countOtros} pagos en total` 
       });
       pagosDelMes.push({ Gimnasta: '================================' });
 

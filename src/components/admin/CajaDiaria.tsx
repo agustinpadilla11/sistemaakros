@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useCajaDiaria } from '../../hooks/useCajaDiaria';
-import { ChevronLeft, ChevronRight, Calculator, Plus, Trash2, Calendar, ShoppingCart, UserCheck, Download, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calculator, Plus, Trash2, Calendar, ShoppingCart, UserCheck, Download, CheckCircle2, Wallet } from 'lucide-react';
 
 export default function CajaDiaria() {
   const { userData } = useAuth();
@@ -25,6 +25,7 @@ export default function CajaDiaria() {
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy, allDayItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,
     totalIngresosGralHoy, totalEgresosGralHoy,
+    totalRetirosSalidasEfvoHoy, saldoActualCaja,
     cajaFinalEfvo, cajaFinalDebito, cajaFinalTransf, totalFinalTodo,
     totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes, resetDailyData
   } = caja;
@@ -292,48 +293,63 @@ export default function CajaDiaria() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Comienzo Caja</span>
-                <span className="text-xl font-black text-slate-700">{formatter.format(comienzoCaja)}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 xl:gap-4">
+             <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                <span className="text-[9px] xl:text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-tight">Comienzo Caja</span>
+                <span className="text-base xl:text-lg font-black text-slate-700 tracking-tighter whitespace-nowrap mt-1">{formatter.format(comienzoCaja)}</span>
              </div>
-             <div className="bg-emerald-50 p-4 rounded-xl shadow-sm border border-emerald-100 flex flex-col justify-between">
-                <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-widest">Ingr. Efectivo</span>
-                <span className="text-xl font-black text-emerald-700">{formatter.format(totalIngEfvoHoy)}</span>
+
+             {/* Tarjeta Destacada: Saldo Actual en Caja */}
+             <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-3 rounded-xl shadow-md border border-emerald-500 flex flex-col justify-between relative overflow-hidden ring-2 ring-emerald-500/20">
+                <div className="flex items-start xl:items-center justify-between gap-1">
+                   <span className="text-[9px] xl:text-[10px] uppercase font-black text-emerald-200 tracking-widest flex items-center gap-1 leading-tight">
+                     <Wallet className="w-3 h-3 xl:w-3.5 xl:h-3.5 text-emerald-300 shrink-0" /> Saldo Actual
+                   </span>
+                   <span className="inline-block w-1.5 h-1.5 xl:w-2 xl:h-2 rounded-full bg-emerald-300 animate-pulse shrink-0 mt-1 xl:mt-0"></span>
+                </div>
+                <div className="my-1">
+                   <span className="text-lg xl:text-xl font-black tracking-tighter text-white whitespace-nowrap block">{formatter.format(saldoActualCaja)}</span>
+                </div>
+                <span className="text-[8px] xl:text-[9px] text-emerald-200/90 font-medium leading-tight">Efectivo real en caja</span>
              </div>
-             <div className="bg-blue-50 p-4 rounded-xl shadow-sm border border-blue-100 flex flex-col justify-between">
-                <span className="text-[10px] uppercase font-bold text-blue-600 tracking-widest">Ingr. Débito</span>
-                <span className="text-xl font-black text-blue-700">{formatter.format(ingDebitoHoy)}</span>
+
+             <div className="bg-emerald-50 p-3 rounded-xl shadow-sm border border-emerald-100 flex flex-col justify-between">
+                <span className="text-[9px] xl:text-[10px] uppercase font-bold text-emerald-600 tracking-widest leading-tight">Ingr. Efectivo</span>
+                <span className="text-base xl:text-lg font-black text-emerald-700 tracking-tighter whitespace-nowrap mt-1">{formatter.format(totalIngEfvoHoy)}</span>
              </div>
-             <div className="bg-purple-50 p-4 rounded-xl shadow-sm border border-purple-100 flex flex-col justify-between">
-                <span className="text-[10px] uppercase font-bold text-purple-600 tracking-widest">Ingr. Transferencia</span>
-                <span className="text-xl font-black text-purple-700">{formatter.format(ingTransfHoy)}</span>
+             <div className="bg-blue-50 p-3 rounded-xl shadow-sm border border-blue-100 flex flex-col justify-between">
+                <span className="text-[9px] xl:text-[10px] uppercase font-bold text-blue-600 tracking-widest leading-tight">Ingr. Débito</span>
+                <span className="text-base xl:text-lg font-black text-blue-700 tracking-tighter whitespace-nowrap mt-1">{formatter.format(ingDebitoHoy)}</span>
              </div>
-             <div className="bg-amber-50 p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col justify-between">
-                <span className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">Se sacó de Caja (Gasto)</span>
-                <span className="text-xl font-black text-amber-700">{formatter.format(totalEgresosGralHoy)}</span>
+             <div className="bg-purple-50 p-3 rounded-xl shadow-sm border border-purple-100 flex flex-col justify-between">
+                <span className="text-[9px] xl:text-[10px] uppercase font-bold text-purple-600 tracking-widest leading-tight">Ingr. Transf.</span>
+                <span className="text-base xl:text-lg font-black text-purple-700 tracking-tighter whitespace-nowrap mt-1">{formatter.format(ingTransfHoy)}</span>
+             </div>
+             <div className="bg-amber-50 p-3 rounded-xl shadow-sm border border-amber-100 flex flex-col justify-between">
+                <span className="text-[9px] xl:text-[10px] uppercase font-bold text-amber-600 tracking-widest leading-tight">Gasto / Salida</span>
+                <span className="text-base xl:text-lg font-black text-amber-700 tracking-tighter whitespace-nowrap mt-1">{formatter.format(totalEgresosGralHoy)}</span>
              </div>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
-               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Efectivo</p>
-               <p className="text-2xl font-black text-emerald-400 relative z-10">{formatter.format(cajaFinalEfvo)}</p>
+               <p className="text-[9px] xl:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 leading-tight">Caja Final Efectivo</p>
+               <p className="text-lg xl:text-xl font-black text-emerald-400 relative z-10 tracking-tighter whitespace-nowrap">{formatter.format(cajaFinalEfvo)}</p>
             </div>
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
-               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Débito</p>
-               <p className="text-2xl font-black text-blue-400 relative z-10">{formatter.format(cajaFinalDebito)}</p>
+               <p className="text-[9px] xl:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 leading-tight">Caja Final Débito</p>
+               <p className="text-lg xl:text-xl font-black text-blue-400 relative z-10 tracking-tighter whitespace-nowrap">{formatter.format(cajaFinalDebito)}</p>
             </div>
             <div className="bg-slate-800 text-white p-4 rounded-xl shadow-md flex flex-col justify-center relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Calculator className="w-12 h-12" /></div>
-               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Caja Final Transferencia</p>
-               <p className="text-2xl font-black text-purple-400 relative z-10">{formatter.format(cajaFinalTransf)}</p>
+               <p className="text-[9px] xl:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 leading-tight">Caja Final Transf.</p>
+               <p className="text-lg xl:text-xl font-black text-purple-400 relative z-10 tracking-tighter whitespace-nowrap">{formatter.format(cajaFinalTransf)}</p>
             </div>
             <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg border border-slate-700 flex flex-col justify-center relative overflow-hidden">
-               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Total Consolidado</p>
-               <p className="text-3xl font-black text-white relative z-10">{formatter.format(totalFinalTodo)}</p>
+               <p className="text-[9px] xl:text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1 leading-tight">Total Consolidado</p>
+               <p className="text-xl xl:text-2xl font-black text-white relative z-10 tracking-tighter whitespace-nowrap">{formatter.format(totalFinalTodo)}</p>
             </div>
           </div>
 
@@ -358,12 +374,12 @@ export default function CajaDiaria() {
                     <span className="block text-sm font-black text-slate-700 mt-1">{formatter.format(totalIngEfvoHoy)}</span>
                   </div>
                   <div className="bg-red-50/50 p-2.5 rounded-lg border border-red-100/50">
-                    <span className="block text-[9px] uppercase font-bold text-red-600 tracking-wider">C: Gastos en Efectivo (-)</span>
-                    <span className="block text-sm font-black text-slate-700 mt-1">{formatter.format(comienzoCaja + totalIngEfvoHoy - cajaFinalEfvo)}</span>
+                    <span className="block text-[9px] uppercase font-bold text-red-600 tracking-wider">C: Salidas / Retiros (-)</span>
+                    <span className="block text-sm font-black text-slate-700 mt-1">{formatter.format(totalRetirosSalidasEfvoHoy)}</span>
                   </div>
                   <div className="bg-purple-50 p-2.5 rounded-lg border border-purple-100">
                     <span className="block text-[9px] uppercase font-bold text-purple-600 tracking-wider">Esperado en Caja (=)</span>
-                    <span className="block text-sm font-black text-slate-700 mt-1" title="A + B - C">{formatter.format(cajaFinalEfvo)}</span>
+                    <span className="block text-sm font-black text-slate-700 mt-1" title="A + B - C">{formatter.format(saldoActualCaja)}</span>
                   </div>
                 </div>
               </div>
@@ -381,12 +397,12 @@ export default function CajaDiaria() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo en Caja (Est.):</span>
-                      <span className="text-sm font-black text-emerald-600">{formatter.format(cajaFinalEfvo)}</span>
+                      <span className="text-sm font-black text-emerald-600">{formatter.format(saldoActualCaja)}</span>
                     </div>
                     <div className="bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
                         <span>Se entregaría a Dueña:</span>
-                        <span className="text-purple-700">{formatter.format(Math.max(0, cajaFinalEfvo - comienzoCaja))}</span>
+                        <span className="text-purple-700">{formatter.format(Math.max(0, saldoActualCaja - comienzoCaja))}</span>
                       </div>
                       <div className="flex justify-between items-center text-[9px] font-medium text-slate-400 uppercase">
                         <span>Fondo que queda en caja:</span>
@@ -395,8 +411,9 @@ export default function CajaDiaria() {
                     </div>
                     <button 
                       onClick={() => {
-                        setEfectivoReal(cajaFinalEfvo.toString());
-                        setEntregadoDuena(Math.max(0, cajaFinalEfvo - comienzoCaja).toString());
+                        const efvoTotalContado = comienzoCaja + totalIngEfvoHoy - totalRetirosSalidasEfvoHoy + (arqueoData?.entregado_duena || 0);
+                        setEfectivoReal(efvoTotalContado.toString());
+                        setEntregadoDuena(Math.max(0, efvoTotalContado - comienzoCaja).toString());
                         setShowArqueo(true);
                       }} 
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -619,7 +636,19 @@ export default function CajaDiaria() {
                                 </td>
                                 <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(t.monto)}</td>
                                 <td className="px-4 py-3 text-right">
-                                   <button onClick={()=>deleteIngreso(t.id, 'torneos_pagos')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                   <button onClick={async () => {
+                                     if (confirm('¿Seguro que deseas eliminar el pago? La gimnasta seguirá en la lista del torneo pero sin el pago registrado.')) {
+                                       try {
+                                         const { doc, updateDoc } = await import('firebase/firestore');
+                                         const { db } = await import('../../firebase/config');
+                                         await updateDoc(doc(db, 'torneos_pagos', t.id), { monto: 0, fecha: null });
+                                         window.location.reload();
+                                       } catch (err) {
+                                         console.error(err);
+                                         alert('Error al eliminar pago del torneo');
+                                       }
+                                     }
+                                   }} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
                                 </td>
                               </tr>
                             );
@@ -771,10 +800,10 @@ export default function CajaDiaria() {
         <div className="fixed inset-0 bg-slate-900/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
              <h2 className="text-sm font-bold uppercase mb-4">Arqueo de Caja</h2>
-             <div className="bg-slate-50 p-3 rounded mb-4 flex justify-between items-center text-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Esperado en Caja:</span>
-                <span className="font-black text-slate-700">{formatter.format(cajaFinalEfvo)}</span>
-             </div>
+              <div className="bg-slate-50 p-3 rounded mb-4 flex justify-between items-center text-xs">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase">Esperado Total Efectivo:</span>
+                 <span className="font-black text-slate-700">{formatter.format(comienzoCaja + totalIngEfvoHoy - totalRetirosSalidasEfvoHoy + (arqueoData?.entregado_duena || 0))}</span>
+              </div>
              <form onSubmit={handleArqueo} className="space-y-4">
                 <div>
                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Total Efectivo Contado (Dueña + Caja) ($)</label>

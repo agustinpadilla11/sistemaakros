@@ -484,14 +484,15 @@ export function useCajaDiaria() {
       const realNum = Number(efectivoReal);
       const entregadoNum = Number(entregadoDuena);
       const quedoNum = realNum - entregadoNum;
+      const esperadoAntesEntrega = comienzoCaja + totalIngEfvoHoy - sumMonto(egresosHoy.filter(isEfectivo));
 
       const data: any = {
         fecha: serverTimestamp() as any,
-        esperado: cajaFinalEfvo,
+        esperado: esperadoAntesEntrega,
         real: realNum,
         entregado_duena: entregadoNum,
         quedo_caja: quedoNum,
-        diferencia: realNum - cajaFinalEfvo,
+        diferencia: realNum - esperadoAntesEntrega,
         usuario: 'Administración'
       };
       await setDoc(doc(db, 'arqueos', dateStr), data);
@@ -549,8 +550,8 @@ export function useCajaDiaria() {
   ];
 
   const allDayItems = [...rawAllDayItems].sort((a: any, b: any) => {
-    const timeA = (a.fecha_pago || a.fecha) ? toDate(a.fecha_pago || a.fecha).getTime() : 0;
-    const timeB = (b.fecha_pago || b.fecha) ? toDate(b.fecha_pago || b.fecha).getTime() : 0;
+    const timeA = (a.actualizado_el || a.creado_el || a.fecha_pago || a.fecha) ? toDate(a.actualizado_el || a.creado_el || a.fecha_pago || a.fecha).getTime() : 0;
+    const timeB = (b.actualizado_el || b.creado_el || b.fecha_pago || b.fecha) ? toDate(b.actualizado_el || b.creado_el || b.fecha_pago || b.fecha).getTime() : 0;
     return timeB - timeA;
   });
 
@@ -560,10 +561,24 @@ export function useCajaDiaria() {
   const totalIngresosGralHoy = totalIngEfvoHoy + ingDebitoHoy + ingTransfHoy;
   const totalEgresosGralHoy = sumMonto(egresosHoy);
 
-  const cajaFinalEfvo = comienzoCaja + totalIngEfvoHoy - sumMonto(egresosHoy.filter(isEfectivo));
+  const egresosEfvoHoy = egresosHoy.filter(isEfectivo);
+  const totalEgresosEfvoHoy = sumMonto(egresosEfvoHoy);
+  const entregadoDuenaHoy = arqueoData?.entregado_duena || 0;
+
+  // Evitar duplicación si la entrega a dueña ya fue registrada como egreso explícito
+  const alreadyInEgresos = entregadoDuenaHoy > 0 && egresosEfvoHoy.some(e =>
+    (e.concepto?.toLowerCase().includes('dueña') || e.concepto?.toLowerCase().includes('duena') || e.concepto?.toLowerCase().includes('retiro')) &&
+    Number(e.monto) === Number(entregadoDuenaHoy)
+  );
+
+  const totalRetirosSalidasEfvoHoy = totalEgresosEfvoHoy + (alreadyInEgresos ? 0 : entregadoDuenaHoy);
+  // Saldo Actual en Caja = (Comienzo Caja) - (Total Retiros / Salidas / Entregas de Efectivo a dueña) + (Ingresos en Efectivo de ventas/cobros)
+  const saldoActualCaja = comienzoCaja - totalRetirosSalidasEfvoHoy + totalIngEfvoHoy;
+
+  const cajaFinalEfvo = saldoActualCaja;
   const cajaFinalDebito = ingDebitoHoy - sumMonto(egresosHoy.filter(isDebito));
   const cajaFinalTransf = ingTransfHoy - sumMonto(egresosHoy.filter(isTransf));
-  const totalFinalTodo = comienzoCaja + totalIngresosGralHoy - totalEgresosGralHoy;
+  const totalFinalTodo = comienzoCaja + totalIngresosGralHoy - totalEgresosGralHoy - (alreadyInEgresos ? 0 : entregadoDuenaHoy);
 
   // ---------- MONTHLY CALCULATIONS ----------
   const allMonthItems = [...cuotas, ...otrosCostos, ...ventasMerch, ...licencias, ...inscripcionesFed, ...matriculas, ...seguros, ...torneosPagos];
@@ -601,7 +616,11 @@ export function useCajaDiaria() {
 
       for (const item of allItemsToDelete) {
         if (item.id) {
-          deletePromises.push(deleteDoc(doc(db, item.collection, item.id)));
+          if (item.collection === 'torneos_pagos') {
+            deletePromises.push(updateDoc(doc(db, item.collection, item.id), { monto: 0, fecha: null }));
+          } else {
+            deletePromises.push(deleteDoc(doc(db, item.collection, item.id)));
+          }
         }
       }
 
@@ -716,6 +735,7 @@ export function useCajaDiaria() {
     allDayItems, allMonthItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,
     totalIngresosGralHoy, totalEgresosGralHoy,
+    totalRetirosSalidasEfvoHoy, saldoActualCaja,
     cajaFinalEfvo, cajaFinalDebito, cajaFinalTransf, totalFinalTodo,
     // Monthly calcs
     totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes,

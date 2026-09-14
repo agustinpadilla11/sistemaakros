@@ -340,15 +340,33 @@ export default function Torneos() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <h3 className="text-sm font-bold uppercase tracking-tight text-slate-800">Participantes</h3>
-              <div className="relative w-full sm:max-w-sm">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input 
-                  type="text"
-                  placeholder="Buscar participante (A-Z)..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                />
+              <div className="flex gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="text"
+                    placeholder="Buscar (A-Z)..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    setPagoForm({
+                      alumna_nombre: '', 
+                      torneo_id: selectedTorneo.id, 
+                      categoria: '', 
+                      monto: '', 
+                      metodo: 'efectivo', 
+                      fecha: new Date().toISOString().split('T')[0]
+                    });
+                    setIsEditingPago('nuevo');
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1 transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Plus className="w-4 h-4" /> Agregar
+                </button>
               </div>
             </div>
             <table className="w-full text-left">

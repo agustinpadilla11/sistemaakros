@@ -457,8 +457,17 @@ export default function Cuotas() {
                     >
                       {alu.nombre_completo}
                     </td>
-                    {MESES.map((_, idx) => {
-                      const mesIndex = idx + 1;
+                    {is2027Onwards && (
+                      <>
+                        <td className="p-2 text-center border-r border-slate-100">
+                           <span className="block w-full h-8 rounded bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-[10px]" title="Próximamente">N/A</span>
+                        </td>
+                        <td className="p-2 text-center border-r border-slate-100">
+                           <span className="block w-full h-8 rounded bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-[10px]" title="Próximamente">N/A</span>
+                        </td>
+                      </>
+                    )}
+                    {visibleMonths.map((mesIndex) => {
                       const c = aluCuotas.find(x => x.mes === mesIndex);
                       const isExento = mesIndex <= 4;
                       

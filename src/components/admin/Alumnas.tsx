@@ -126,12 +126,22 @@ export default function Alumnas() {
       });
   };
 
+  const getBajaCutoffMonth = (date: Date) => {
+    const d = new Date(date);
+    // Si la fecha de baja es del 21 en adelante, se considera baja del mes siguiente.
+    if (d.getDate() >= 21) {
+      d.setMonth(d.getMonth() + 1);
+    }
+    return d;
+  };
+
   const getBajasPorMes = () => {
     const groups: Record<string, any[]> = {};
     bajas.forEach(b => {
       if (b.fecha) {
         const date = b.fecha.toDate ? b.fecha.toDate() : new Date(b.fecha);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const cutoffDate = getBajaCutoffMonth(date);
+        const key = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, '0')}`;
         if (!groups[key]) groups[key] = [];
         groups[key].push(b);
       }
@@ -150,21 +160,21 @@ export default function Alumnas() {
       });
   };
 
-  const exportBajasExcel = () => {
-    const dataToExport = bajas.map(b => {
+  const exportBajasExcel = (bajasParaExportar: any[], monthLabel: string) => {
+    const dataToExport = bajasParaExportar.map(b => {
       const date = b.fecha?.toDate ? b.fecha.toDate() : new Date(b.fecha);
       return {
         'Nombre Completo': b.alumna_nombre,
         'Grupo al que pertenecía': b.grupo_nombre + (b.grupo_horario ? ` (${b.grupo_horario})` : ''),
-        'Día de Baja': date.toLocaleDateString('es-AR')
+        'Día de Baja (Real)': date.toLocaleDateString('es-AR')
       };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Bajas");
-    worksheet['!cols'] = [{ wch: 30 }, { wch: 35 }, { wch: 15 }];
-    XLSX.writeFile(workbook, `Bajas_Gimnastas_${new Date().getFullYear()}.xlsx`);
+    worksheet['!cols'] = [{ wch: 30 }, { wch: 45 }, { wch: 20 }];
+    XLSX.writeFile(workbook, `Bajas_Gimnastas_${monthLabel.replace(/ /g, '_')}.xlsx`);
   };
 
   const exportGimnastasExcel = async () => {
@@ -199,7 +209,8 @@ export default function Alumnas() {
         let mesDetalle = '';
         const baja = bajas.find(b => b.alumna_dni === a.dni || b.alumna_nombre === a.nombre_completo);
         if (baja && baja.fecha) {
-          const bDate = baja.fecha.toDate ? baja.fecha.toDate() : new Date(baja.fecha);
+          const rawDate = baja.fecha.toDate ? baja.fecha.toDate() : new Date(baja.fecha);
+          const bDate = getBajaCutoffMonth(rawDate);
           mesDetalle = bDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
         }
         bajasList.push({ nombre: a.nombre_completo, mes: mesDetalle });
@@ -250,14 +261,6 @@ export default function Alumnas() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
         <h1 className="text-base lg:text-lg font-black uppercase tracking-tight">Gimnastas</h1>
         <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-          {activeSubTab === 'bajas' && bajas.length > 0 && (
-            <button 
-              onClick={exportBajasExcel} 
-              className="flex-1 lg:flex-none text-center bg-green-50 text-green-700 px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-green-100 transition-colors border border-green-200 whitespace-nowrap flex items-center justify-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5" /> Exportar Bajas
-            </button>
-          )}
           <button 
             onClick={exportGimnastasExcel}
             className="flex-1 lg:flex-none text-center bg-blue-50 text-blue-700 px-3 lg:px-4 py-2 rounded text-[9px] lg:text-[10px] font-bold uppercase tracking-wide hover:bg-blue-100 transition-colors border border-blue-200 whitespace-nowrap flex items-center justify-center gap-1.5"
@@ -489,9 +492,17 @@ export default function Alumnas() {
           ) : (
             getBajasPorMes().map(group => (
               <div key={group.key} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-red-50/50 flex justify-between items-center">
-                  <h3 className="text-xs font-black uppercase text-red-900 tracking-wider">{group.monthLabel}</h3>
-                  <span className="text-[10px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-full">{group.list.length} BAJAS</span>
+                <div className="p-4 border-b border-slate-100 bg-red-50/50 flex justify-between items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <h3 className="text-xs font-black uppercase text-red-900 tracking-wider">{group.monthLabel}</h3>
+                    <span className="text-[10px] font-black text-red-600 bg-red-100 px-2 py-0.5 rounded-full whitespace-nowrap">{group.list.length} BAJAS</span>
+                  </div>
+                  <button 
+                    onClick={() => exportBajasExcel(group.list, group.monthLabel)}
+                    className="flex text-center bg-green-50 text-green-700 px-3 py-1.5 rounded text-[9px] font-bold uppercase tracking-wide hover:bg-green-100 transition-colors border border-green-200 items-center justify-center gap-1 whitespace-nowrap shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Exportar
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
