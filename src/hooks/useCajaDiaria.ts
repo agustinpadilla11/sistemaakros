@@ -852,11 +852,7 @@ export function useCajaDiaria() {
       const resumenData = [
          { Categoria: '💵 Total Efectivo', Monto: totalEfectivo, 'Cantidad de Pagos': countEfectivo },
          { Categoria: '💳 Total Tarjeta/Débito', Monto: totalDebito, 'Cantidad de Pagos': countDebito },
-         { Categoria: '', Monto: '', 'Cantidad de Pagos': '' },
-         { Categoria: '🏦 Detalle Transf Cta Pato', Monto: totalTransfPato, 'Cantidad de Pagos': countTransfPato },
-         { Categoria: '🏦 Detalle Transf Cta AK', Monto: totalTransfAk, 'Cantidad de Pagos': countTransfAk },
-         { Categoria: '🏦 Detalle Transferencia/MP', Monto: totalTransferencia, 'Cantidad de Pagos': countTransferencia },
-         { Categoria: '📊 TOTAL TRANSFERENCIAS', Monto: totalTodasTransf, 'Cantidad de Pagos': countTodasTransf },
+         { Categoria: '🏦 TOTAL TRANSFERENCIAS', Monto: totalTodasTransf, 'Cantidad de Pagos': countTodasTransf },
          { Categoria: '', Monto: '', 'Cantidad de Pagos': '' },
          { Categoria: '❓ Total Otros', Monto: totalOtros, 'Cantidad de Pagos': countOtros },
          { Categoria: '', Monto: '', 'Cantidad de Pagos': '' },
