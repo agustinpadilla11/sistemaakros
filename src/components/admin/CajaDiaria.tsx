@@ -10,7 +10,7 @@ export default function CajaDiaria() {
   if (!userData) return null;
 
   const {
-    currentDate, currentMonthDate, changeDay, changeMonth,
+    currentDate, currentMonthDate, changeDay, changeMonth, jumpToDate,
     loading, formatter, exportToExcel, MESES,
     comienzoCaja, alumnas, productos,
     posTab, setPosTab,
@@ -80,11 +80,18 @@ export default function CajaDiaria() {
         <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
         <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-start">
           <button onClick={() => changeDay(-1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 shrink-0"><ChevronLeft className="w-4 h-4" /></button>
-          <div className="text-center">
+          <div className="text-center flex flex-col items-center">
             <h1 className="text-base lg:text-lg font-black uppercase tracking-tight text-slate-800">
               {currentDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h1>
-            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{currentDate.getFullYear()}</p>
+            <input 
+              type="month" 
+              value={`${currentMonthDate.getFullYear()}-${String(currentMonthDate.getMonth() + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                if(e.target.value) jumpToDate(e.target.value);
+              }}
+              className="mt-1 bg-slate-50 border border-slate-200 text-slate-500 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest outline-none hover:border-purple-300 transition-colors cursor-pointer"
+            />
           </div>
           <button onClick={() => changeDay(1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 shrink-0"><ChevronRight className="w-4 h-4" /></button>
         </div>

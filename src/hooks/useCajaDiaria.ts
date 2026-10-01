@@ -257,6 +257,13 @@ export function useCajaDiaria() {
     setCurrentMonthDate(m);
   };
 
+  const jumpToDate = (dateStringYYYYMM: string) => {
+    const [year, month] = dateStringYYYYMM.split('-');
+    const newDate = new Date(parseInt(year), parseInt(month) - 1, 1, 12, 0, 0);
+    setCurrentDate(newDate);
+    setCurrentMonthDate(newDate);
+  };
+
   // ---------- POS ACTIONS ----------
   const handlePOSCuota = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -900,7 +907,7 @@ export function useCajaDiaria() {
 
   return {
     // Navigation
-    currentDate, currentMonthDate, changeDay, changeMonth, dateStr,
+    currentDate, currentMonthDate, changeDay, changeMonth, jumpToDate, dateStr,
     // Loading
     loading,
     // Data
