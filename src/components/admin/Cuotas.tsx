@@ -38,6 +38,7 @@ export default function Cuotas() {
   const [selectedHistoryAlumna, setSelectedHistoryAlumna] = useState<any>(null);
   const [isDeudorasOpen, setIsDeudorasOpen] = useState(false);
   const [deudorasMesFiltro, setDeudorasMesFiltro] = useState<number | 'todos'>('todos');
+  const [deudorasSearch, setDeudorasSearch] = useState('');
 
   const today = new Date();
 
@@ -64,10 +65,13 @@ export default function Cuotas() {
     alumnas.filter(a => a.estado !== 'inactiva').forEach(alu => {
       const aluCuotas = cuotas[alu.id] || [];
       const mesesAdeudados: string[] = [];
+      let deudaTotal = 0;
+
       if (deudorasMesFiltro !== 'todos') {
         const c = aluCuotas.find(x => x.mes === deudorasMesFiltro);
         if (!c || c.estado !== 'pagado') {
           mesesAdeudados.push(MESES[deudorasMesFiltro - 1]);
+          if (c && c.monto) deudaTotal += Number(c.monto);
         }
       } else {
         // Empezamos desde Junio (mes 6) según lo solicitado, ignorando Mayo
@@ -75,19 +79,25 @@ export default function Cuotas() {
           const c = aluCuotas.find(x => x.mes === i);
           if (!c || c.estado !== 'pagado') {
             mesesAdeudados.push(MESES[i - 1]);
+            if (c && c.monto) deudaTotal += Number(c.monto);
           }
         }
       }
 
       if (mesesAdeudados.length > 0) {
+        if (deudorasSearch && !alu.nombre_completo.toLowerCase().includes(deudorasSearch.toLowerCase())) {
+          return; // Skip if search doesn't match
+        }
         deudoras.push({
           nombre: alu.nombre_completo,
-          meses: mesesAdeudados
+          meses: mesesAdeudados,
+          cantidadMeses: mesesAdeudados.length,
+          deudaTotal
         });
       }
     });
 
-    return deudoras.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    return deudoras.sort((a, b) => b.cantidadMeses - a.cantidadMeses || a.nombre.localeCompare(b.nombre));
   };
   const [yearFil, setYearFil] = useState(today.getFullYear());
 
@@ -738,26 +748,53 @@ export default function Cuotas() {
              </div>
              
              <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                <div className="mb-4">
+                  <input 
+                    type="text" 
+                    placeholder="Buscar gimnasta (A-Z)..." 
+                    value={deudorasSearch}
+                    onChange={e => setDeudorasSearch(e.target.value)}
+                    className="w-full pl-4 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-sm"
+                  />
+                </div>
                 {getDeudoras().length === 0 ? (
                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                      <span className="text-4xl mb-2">🎉</span>
                      <p className="text-sm font-bold uppercase tracking-widest">No hay deudoras para este periodo.</p>
                    </div>
                 ) : (
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                     {getDeudoras().map((d, i) => (
-                        <div key={i} className="flex flex-col bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-red-200 hover:shadow-md transition-all">
-                           <span className="font-black text-slate-800 uppercase text-xs mb-3 truncate" title={d.nombre}>{d.nombre}</span>
-                           <div className="flex flex-wrap gap-1.5">
-                              {d.meses.map((m: string) => (
-                                <span key={m} className="text-[9px] font-black bg-red-50 text-red-600 border border-red-100 px-2 py-1 rounded-md uppercase tracking-wider">
-                                  {m}
-                                </span>
-                              ))}
-                           </div>
-                        </div>
-                     ))}
-                   </div>
+                  <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-100">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-b border-slate-100">
+                          <th className="px-4 py-3 font-black">Gimnasta</th>
+                          <th className="px-4 py-3 font-black">Meses Adeudados</th>
+                          <th className="px-4 py-3 font-black text-center">Cant.</th>
+                          <th className="px-4 py-3 font-black text-right">Deuda Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {getDeudoras().map((d, i) => (
+                          <tr key={i} className="hover:bg-red-50/30 transition-colors">
+                            <td className="px-4 py-3 text-xs font-black uppercase text-slate-800">{d.nombre}</td>
+                            <td className="px-4 py-3">
+                               <div className="flex flex-wrap gap-1">
+                                  {d.meses.map((m: string) => (
+                                    <span key={m} className="text-[9px] font-black bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                      {m}
+                                    </span>
+                                  ))}
+                               </div>
+                            </td>
+                            <td className="px-4 py-3 text-xs font-bold text-slate-600 text-center">{d.cantidadMeses}</td>
+                            <td className="px-4 py-3 text-xs font-black text-red-600 text-right">
+                               {d.deudaTotal > 0 ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(d.deudaTotal) : 'S/D'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
              </div>
              <div className="p-4 bg-slate-50 border-t border-slate-100 text-right">
