@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 import type { Alumna, Producto, ArqueoData } from '../types';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -683,7 +684,7 @@ export function useCajaDiaria() {
     
     const tE = sumMonto(dataIngresos.filter(i => i.Metodo === 'EFECTIVO'));
     const tD = sumMonto(dataIngresos.filter(i => i.Metodo === 'DEBITO'));
-    const tT = sumMonto(dataIngresos.filter(i => i.Metodo === 'TRANSFERENCIA' || i.Metodo === 'MP' || i.Metodo === 'MERCADO PAGO'));
+    const tT = sumMonto(dataIngresos.filter(i => i.Metodo.includes('TRANSF') || i.Metodo === 'MP' || i.Metodo.includes('MERCADO')));
     const tEgr = dataEgresos.reduce((a,b) => a + b.Monto, 0);
 
     const dataResumen = [
@@ -728,6 +729,133 @@ export function useCajaDiaria() {
     XLSX.writeFile(wb, `Caja_Akros_${MESES[currentMonthDate.getMonth()]}_${currentMonthDate.getFullYear()}.xlsx`);
   };
 
+  const [exportMonthStr, setExportMonthStr] = useState<string>(currentDate.toISOString().split('-').slice(0, 2).join('-'));
+
+  const handleExportarMesCuotas = async () => {
+    try {
+      const [yearStr, monthStr] = exportMonthStr.split('-');
+      const year = parseInt(yearStr, 10);
+      const monthNum = parseInt(monthStr, 10);
+      const monthStart = new Date(year, monthNum - 1, 1);
+      const monthEnd = new Date(year, monthNum, 0, 23, 59, 59, 999);
+      
+      const paidCuotasSnap = await getDocs(query(
+        collection(db, 'cuotas'),
+        where('estado', '==', 'pagado')
+      ));
+      
+      const alumnasSnap = await getDocs(collection(db, 'alumnas'));
+      const alumnasMap: Record<string, string> = {};
+      alumnasSnap.forEach(d => {
+         alumnasMap[d.id] = d.data().nombre_completo || 'Desconocida';
+      });
+
+      const pagosDelMes: any[] = [];
+      let totalEfectivo = 0;
+      let totalTransferencia = 0;
+      let totalTransfPato = 0;
+      let totalTransfAk = 0;
+      let totalDebito = 0;
+      let totalOtros = 0;
+      let countEfectivo = 0;
+      let countTransferencia = 0;
+      let countTransfPato = 0;
+      let countTransfAk = 0;
+      let countDebito = 0;
+      let countOtros = 0;
+      const NOMBRES_MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+      paidCuotasSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.fecha_pago) {
+          const fp = data.fecha_pago.toDate ? data.fecha_pago.toDate() : new Date(data.fecha_pago);
+          if (fp >= monthStart && fp <= monthEnd) {
+             const metodo = (data.metodo_pago || data.metodo || 'Efectivo').toLowerCase();
+             const monto = Number(data.monto) || 0;
+             
+             let metodoLabel = 'Efectivo';
+             if (metodo.includes('efectivo')) { totalEfectivo += monto; countEfectivo++; metodoLabel = 'Efectivo'; }
+             else if (metodo.includes('transf cta pato')) { totalTransfPato += monto; countTransfPato++; metodoLabel = 'Transf Cta Pato'; }
+             else if (metodo.includes('transf cta ak')) { totalTransfAk += monto; countTransfAk++; metodoLabel = 'Transf Cta AK'; }
+             else if (metodo.includes('transferencia') || metodo.includes('mp') || metodo.includes('mercado pago') || metodo.includes('mercado_pago')) { totalTransferencia += monto; countTransferencia++; metodoLabel = 'Transferencia/MP'; }
+             else if (metodo.includes('debito') || metodo.includes('débito') || metodo.includes('tarjeta')) { totalDebito += monto; countDebito++; metodoLabel = 'Tarjeta/Débito'; }
+             else { totalOtros += monto; countOtros++; metodoLabel = 'Otros'; }
+
+             pagosDelMes.push({
+               Gimnasta: alumnasMap[data.alumna_id] || 'Desconocida',
+               'Mes Abonado': `${NOMBRES_MESES[data.mes - 1] || data.mes} ${data.anio}`,
+               Monto: monto,
+               Metodo: metodoLabel,
+               'Fecha de Pago': format(fp, 'dd/MM/yyyy HH:mm'),
+               _dateObj: fp
+             });
+          }
+        }
+      });
+
+      if (pagosDelMes.length === 0) {
+         alert("No hay pagos registrados en este mes para exportar.");
+         return;
+      }
+
+      pagosDelMes.sort((a, b) => b._dateObj.getTime() - a._dateObj.getTime());
+      
+      const detalleLimpio = pagosDelMes.map(p => {
+        const { _dateObj, ...rest } = p;
+        return rest;
+      });
+
+      const totalTodasTransf = totalTransferencia + totalTransfPato + totalTransfAk;
+      const countTodasTransf = countTransferencia + countTransfPato + countTransfAk;
+      const granTotal = totalEfectivo + totalDebito + totalTodasTransf + totalOtros;
+      const granCount = countEfectivo + countDebito + countTodasTransf + countOtros;
+
+      const resumenData = [
+         { Categoria: '💵 Total Efectivo', Monto: totalEfectivo, 'Cantidad de Pagos': countEfectivo },
+         { Categoria: '💳 Total Tarjeta/Débito', Monto: totalDebito, 'Cantidad de Pagos': countDebito },
+         { Categoria: '', Monto: '', 'Cantidad de Pagos': '' },
+         { Categoria: '🏦 Detalle Transf Cta Pato', Monto: totalTransfPato, 'Cantidad de Pagos': countTransfPato },
+         { Categoria: '🏦 Detalle Transf Cta AK', Monto: totalTransfAk, 'Cantidad de Pagos': countTransfAk },
+         { Categoria: '🏦 Detalle Transferencia/MP', Monto: totalTransferencia, 'Cantidad de Pagos': countTransferencia },
+         { Categoria: '📊 TOTAL TRANSFERENCIAS', Monto: totalTodasTransf, 'Cantidad de Pagos': countTodasTransf },
+         { Categoria: '', Monto: '', 'Cantidad de Pagos': '' },
+         { Categoria: '❓ Total Otros', Monto: totalOtros, 'Cantidad de Pagos': countOtros },
+         { Categoria: '', Monto: '', 'Cantidad de Pagos': '' },
+         { Categoria: '💰 TOTAL RECAUDADO', Monto: granTotal, 'Cantidad de Pagos': granCount }
+      ];
+
+      const formatSheetXlsx = (ws: any) => {
+        const range = XLSX.utils.decode_range(ws['!ref'] || "A1:A1");
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cell = ws[XLSX.utils.encode_cell({c: C, r: R})];
+            if (cell && cell.t === 'n') cell.z = '"$"#,##0.00';
+          }
+        }
+        return ws;
+      };
+
+      const wb = XLSX.utils.book_new();
+
+      const wsResumen = XLSX.utils.json_to_sheet(resumenData);
+      wsResumen['!cols'] = [{wch: 35}, {wch: 20}, {wch: 20}];
+      formatSheetXlsx(wsResumen);
+
+      const wsDetalle = XLSX.utils.json_to_sheet(detalleLimpio);
+      wsDetalle['!cols'] = [{wch: 30}, {wch: 20}, {wch: 15}, {wch: 25}, {wch: 20}];
+      formatSheetXlsx(wsDetalle);
+
+      XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen Mensual");
+      XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle Cuotas");
+      
+      XLSX.writeFile(wb, `Resumen_Ingresos_Cuotas_${monthStr}_${yearStr}.xlsx`);
+
+    } catch (e) {
+      console.error(e);
+      alert('Error al generar el Excel');
+    }
+  };
+
   const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
 
   return {
@@ -760,6 +888,7 @@ export function useCajaDiaria() {
     // Monthly calcs
     totCuotasEfvoMes, totOtrosEfvoMes, totDebitoMes, totTransfMes, totEgresosMes, totFinalMes,
     // Utils
-    formatter, exportToExcel, MESES, resetDailyData
+    formatter, exportToExcel, MESES, resetDailyData,
+    exportMonthStr, setExportMonthStr, handleExportarMesCuotas
   };
 }
