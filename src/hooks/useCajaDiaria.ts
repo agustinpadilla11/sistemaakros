@@ -38,8 +38,8 @@ export function useCajaDiaria() {
   const [comienzoCaja, setComienzoCaja] = useState<number>(0);
 
   // New income sources
-  const [licencias, setLicencias] = useState<Record<string, any>[]>([]);
-  const [inscripcionesFed, setInscripcionesFed] = useState<Record<string, any>[]>([]);
+  const [federacion, setFederacion] = useState<Record<string, any>[]>([]);
+  
   const [matriculas, setMatriculas] = useState<Record<string, any>[]>([]);
   const [seguros, setSeguros] = useState<Record<string, any>[]>([]);
   const [torneosPagos, setTorneosPagos] = useState<Record<string, any>[]>([]);
@@ -93,8 +93,8 @@ export function useCajaDiaria() {
       const ventasSnap = await getDocs(collection(db, 'ventas_merch'));
       const egresosSnap = await getDocs(collection(db, 'egresos'));
       const arqueoSnap = await getDocs(collection(db, 'arqueos'));
-      const licSnap = await getDocs(collection(db, 'federacion_licencias'));
-      const insSnap = await getDocs(collection(db, 'federacion_inscripciones'));
+      
+      
       const matSnap = await getDocs(collection(db, 'matriculas'));
       const segSnap = await getDocs(collection(db, 'seguros'));
       const torSnap = await getDocs(collection(db, 'torneos_pagos'));
@@ -115,8 +115,7 @@ export function useCajaDiaria() {
          cuotasSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha_pago) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
          otrosSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
          ventasSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
-         licSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
-         insSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
+         
          matSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
          segSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
          torSnap.docs.map(d=>d.data()).filter(d => isY(d.fecha) && (d.metodo_pago || d.metodo || 'efectivo') === 'efectivo').forEach(d => sumIn += (d.monto||0));
@@ -128,7 +127,11 @@ export function useCajaDiaria() {
       };
 
       const allCajasMap = cajaSnap.docs.reduce((acc: any, d) => ({...acc, [d.id]: d.data().monto}), {});
-      const allArqueosMap = arqueoSnap.docs.reduce((acc: any, d) => ({...acc, [d.id]: d.data().entregado_duena || 0}), {});
+      const allArqueosMap = arqueoSnap.docs.reduce((acc: any, d) => {
+        const data = d.data();
+        const dateKey = data.fecha_str || d.id.split('_')[0];
+        return { ...acc, [dateKey]: (acc[dateKey] || 0) + (data.entregado_duena || 0) };
+      }, {});
 
       let currentCheckDate = new Date(currentDate);
       let foundManual = false;
@@ -198,19 +201,33 @@ export function useCajaDiaria() {
           return d >= startOfMonth && d <= endOfMonth;
         }));
 
-      const dayArqueo = arqueoSnap.docs.find(d => d.id === dateStr);
-      setArqueoData(dayArqueo ? dayArqueo.data() as ArqueoData : null);
+      const dayArqueos = arqueoSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(a => (a.fecha_str || a.id.split('_')[0]) === dateStr)
+        .sort((a, b) => {
+           const timeA = a.fecha?.toMillis ? a.fecha.toMillis() : 0;
+           const timeB = b.fecha?.toMillis ? b.fecha.toMillis() : 0;
+           return timeA - timeB;
+        });
+        
+      if (dayArqueos.length > 0) {
+        const lastArqueo = dayArqueos[dayArqueos.length - 1];
+        const totalEntregado = dayArqueos.reduce((sum, curr) => sum + (curr.entregado_duena || 0), 0);
+        setArqueoData({ ...lastArqueo, entregado_duena: totalEntregado } as ArqueoData);
+      } else {
+        setArqueoData(null);
+      }
 
       const filterByMonth = (docs: any[]) => docs.filter((x: any) => {
         const d = toDate(x.fecha);
         return d >= startOfMonth && d <= endOfMonth;
       });
 
-      setLicencias(filterByMonth(licSnap.docs.map(d => ({id: d.id, ...d.data()}))));
-      setInscripcionesFed(filterByMonth(insSnap.docs.map(d => ({id: d.id, ...d.data()}))));
+      const allTor = torSnap.docs.map(d => ({id: d.id, ...d.data()}));
+      setFederacion(filterByMonth(allTor.filter(t => t.tipo === 'federacion')));
       setMatriculas(filterByMonth(matSnap.docs.map(d => ({id: d.id, ...d.data()}))));
       setSeguros(filterByMonth(segSnap.docs.map(d => ({id: d.id, ...d.data()}))));
-      setTorneosPagos(filterByMonth(torSnap.docs.map(d => ({id: d.id, ...d.data()}))));
+      setTorneosPagos(filterByMonth(allTor.filter(t => t.tipo !== 'federacion')));
 
       const alSnap = await getDocs(collection(db, 'alumnas'));
       setAlumnas(alSnap.docs.map(d => ({id: d.id, ...d.data()} as any)).filter((a: any) => a.estado !== 'inactiva'));
@@ -488,6 +505,7 @@ export function useCajaDiaria() {
 
       const data: any = {
         fecha: serverTimestamp() as any,
+        fecha_str: dateStr,
         esperado: esperadoAntesEntrega,
         real: realNum,
         entregado_duena: entregadoNum,
@@ -495,8 +513,8 @@ export function useCajaDiaria() {
         diferencia: realNum - esperadoAntesEntrega,
         usuario: 'Administración'
       };
-      await setDoc(doc(db, 'arqueos', dateStr), data);
-      setArqueoData(data);
+      await setDoc(doc(db, 'arqueos', `${dateStr}_${Date.now()}`), data);
+      await loadData();
       setShowArqueo(false);
       setEfectivoReal('');
       setEntregadoDuena('');
@@ -508,9 +526,13 @@ export function useCajaDiaria() {
   };
 
   const clearArqueo = async () => {
-    if (!window.confirm('¿Seguro que deseas eliminar el arqueo actual?')) return;
+    if (!window.confirm('¿Seguro que deseas eliminar los arqueos de hoy?')) return;
     try {
-      await deleteDoc(doc(db, 'arqueos', dateStr));
+      const arqueoSnap = await getDocs(collection(db, 'arqueos'));
+      const toDelete = arqueoSnap.docs.filter(d => (d.data().fecha_str || d.id.split('_')[0]) === dateStr);
+      for (const d of toDelete) {
+        await deleteDoc(doc(db, 'arqueos', d.id));
+      }
       setArqueoData(null);
       setEfectivoReal('');
       setEntregadoDuena('');
@@ -531,8 +553,8 @@ export function useCajaDiaria() {
   const cuotasHoy = cuotas.filter(c => isSameDay(toDate(c.fecha_pago)));
   const otrosHoy = otrosCostos.filter(c => isSameDay(toDate(c.fecha)));
   const merchHoy = ventasMerch.filter(v => isSameDay(toDate(v.fecha)));
-  const licenciasHoy = licencias.filter(l => isSameDay(toDate(l.fecha)));
-  const inscripcionesFedHoy = inscripcionesFed.filter(i => isSameDay(toDate(i.fecha)));
+  const federacionHoy = federacion.filter(l => isSameDay(toDate(l.fecha)));
+  
   const matriculasHoy = matriculas.filter(m => isSameDay(toDate(m.fecha)));
   const segurosHoy = seguros.filter(s => isSameDay(toDate(s.fecha)));
   const torneosPagosHoy = torneosPagos.filter(t => isSameDay(toDate(t.fecha)));
@@ -542,8 +564,8 @@ export function useCajaDiaria() {
     ...cuotasHoy.map(x => ({ ...x, _type: 'cuota' as const })),
     ...otrosHoy.map(x => ({ ...x, _type: 'otro' as const })),
     ...merchHoy.map(x => ({ ...x, _type: 'merch' as const })),
-    ...licenciasHoy.map(x => ({ ...x, _type: 'licencia' as const })),
-    ...inscripcionesFedHoy.map(x => ({ ...x, _type: 'inscripcion' as const })),
+    ...federacionHoy.map(x => ({ ...x, _type: 'federacion' as const })),
+    
     ...matriculasHoy.map(x => ({ ...x, _type: 'matricula' as const })),
     ...segurosHoy.map(x => ({ ...x, _type: 'seguro' as const })),
     ...torneosPagosHoy.map(x => ({ ...x, _type: 'torneo' as const })),
@@ -552,7 +574,7 @@ export function useCajaDiaria() {
   const allDayItems = [...rawAllDayItems].sort((a: any, b: any) => {
     const timeA = (a.actualizado_el || a.creado_el || a.fecha_pago || a.fecha) ? toDate(a.actualizado_el || a.creado_el || a.fecha_pago || a.fecha).getTime() : 0;
     const timeB = (b.actualizado_el || b.creado_el || b.fecha_pago || b.fecha) ? toDate(b.actualizado_el || b.creado_el || b.fecha_pago || b.fecha).getTime() : 0;
-    return timeB - timeA;
+    return timeB - timeA; // Más reciente arriba, más antiguo abajo
   });
 
   const totalIngEfvoHoy = sumMonto(allDayItems.filter(isEfectivo));
@@ -581,10 +603,10 @@ export function useCajaDiaria() {
   const totalFinalTodo = comienzoCaja + totalIngresosGralHoy - totalEgresosGralHoy - (alreadyInEgresos ? 0 : entregadoDuenaHoy);
 
   // ---------- MONTHLY CALCULATIONS ----------
-  const allMonthItems = [...cuotas, ...otrosCostos, ...ventasMerch, ...licencias, ...inscripcionesFed, ...matriculas, ...seguros, ...torneosPagos];
+  const allMonthItems = [...cuotas, ...otrosCostos, ...ventasMerch, ...federacion, ...matriculas, ...seguros, ...torneosPagos];
 
   const totCuotasEfvoMes = sumMonto(cuotas.filter(c => getMetodo(c) === 'efectivo'));
-  const totOtrosEfvoMes = sumMonto([...otrosCostos, ...ventasMerch, ...licencias, ...inscripcionesFed, ...matriculas, ...seguros, ...torneosPagos].filter(isEfectivo));
+  const totOtrosEfvoMes = sumMonto([...otrosCostos, ...ventasMerch, ...federacion, ...matriculas, ...seguros, ...torneosPagos].filter(isEfectivo));
   const totDebitoMes = sumMonto(allMonthItems.filter(isDebito));
   const totTransfMes = sumMonto(allMonthItems.filter(isTransf));
   const totEgresosMes = sumMonto(egresos);
@@ -604,8 +626,7 @@ export function useCajaDiaria() {
         ...cuotasHoy.map(i => ({ id: i.id, collection: 'cuotas' })),
         ...otrosHoy.map(i => ({ id: i.id, collection: 'otros_costos' })),
         ...merchHoy.map(i => ({ id: i.id, collection: 'ventas_merch' })),
-        ...licenciasHoy.map(i => ({ id: i.id, collection: 'federacion_licencias' })),
-        ...inscripcionesFedHoy.map(i => ({ id: i.id, collection: 'federacion_inscripciones' })),
+        ...federacionHoy.map(i => ({ id: i.id, collection: 'torneos_pagos' })),
         ...matriculasHoy.map(i => ({ id: i.id, collection: 'matriculas' })),
         ...segurosHoy.map(i => ({ id: i.id, collection: 'seguros' })),
         ...torneosPagosHoy.map(i => ({ id: i.id, collection: 'torneos_pagos' })),
@@ -647,9 +668,8 @@ export function useCajaDiaria() {
       ...cuotas.map(c => ({ Fecha: toDate(c.fecha_pago).toLocaleDateString('es-AR'), Tipo: 'CUOTA', Metodo: getMetodo(c).toUpperCase(), Monto: c.monto, Concepto: `MES ${c.mes}/${c.anio}`, Gimnasta: alumnas.find(a => a.id === c.alumna_id)?.nombre_completo || 'N/A' })),
       ...otrosCostos.map(o => ({ Fecha: toDate(o.fecha).toLocaleDateString('es-AR'), Tipo: 'OTRO', Metodo: getMetodo(o).toUpperCase(), Monto: o.monto, Concepto: (o.concepto || '').toUpperCase(), Gimnasta: alumnas.find(a => a.id === o.alumna_id)?.nombre_completo || 'N/A' })),
       ...ventasMerch.map(v => ({ Fecha: toDate(v.fecha).toLocaleDateString('es-AR'), Tipo: 'INDUMENTARIA/KIOSKO', Metodo: getMetodo(v).toUpperCase(), Monto: v.monto, Concepto: (v.nombre_producto || v.concepto || '').toUpperCase(), Gimnasta: 'VENTA MOSTRADOR' })),
-      ...licencias.map(l => ({ Fecha: toDate(l.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION (LICENCIA)', Metodo: getMetodo(l).toUpperCase(), Monto: l.monto, Concepto: 'LICENCIA ANUAL', Gimnasta: (l.alumna_nombre || '').toUpperCase() })),
-      ...inscripcionesFed.map(i => ({ Fecha: toDate(i.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION (INSCRIPCION)', Metodo: getMetodo(i).toUpperCase(), Monto: i.monto, Concepto: 'INSCRIPCION TORNEO', Gimnasta: (i.alumna_nombre || '').toUpperCase() })),
-      ...matriculas.map(m => ({ Fecha: toDate(m.fecha).toLocaleDateString('es-AR'), Tipo: 'MATRICULA', Metodo: getMetodo(m).toUpperCase(), Monto: m.monto, Concepto: 'PAGO MATRICULA', Gimnasta: (m.alumna_nombre || '').toUpperCase() })),
+      ...federacion.map(l => ({ Fecha: toDate(l.fecha).toLocaleDateString('es-AR'), Tipo: 'FEDERACION', Metodo: getMetodo(l).toUpperCase(), Monto: l.monto, Concepto: 'FEDERACION', Gimnasta: (l.alumna_nombre || '').toUpperCase() })),
+      ...matriculas.map(m => ({ Fecha: toDate(m.fecha).toLocaleDateString('es-AR'), Tipo: 'INSCRIPCION', Metodo: getMetodo(m).toUpperCase(), Monto: m.monto, Concepto: 'PAGO INSCRIPCION ANUAL', Gimnasta: (m.alumna_nombre || '').toUpperCase() })),
       ...seguros.map(s => ({ Fecha: toDate(s.fecha).toLocaleDateString('es-AR'), Tipo: 'SEGURO', Metodo: getMetodo(s).toUpperCase(), Monto: s.monto, Concepto: 'PAGO SEGURO', Gimnasta: (s.alumna_nombre || '').toUpperCase() })),
       ...torneosPagos.map(t => ({ Fecha: toDate(t.fecha).toLocaleDateString('es-AR'), Tipo: 'TORNEO INTERNO', Metodo: getMetodo(t).toUpperCase(), Monto: t.monto, Concepto: (t.categoria || 'TORNEO').toUpperCase(), Gimnasta: (t.alumna_nombre || '').toUpperCase() })),
     ];
@@ -717,7 +737,7 @@ export function useCajaDiaria() {
     loading,
     // Data
     cuotas, otrosCostos, ventasMerch, egresos, comienzoCaja,
-    licencias, inscripcionesFed, matriculas, seguros, torneosPagos,
+    federacion, matriculas, seguros, torneosPagos,
     alumnas, productos,
     // POS
     posTab, setPosTab,
@@ -730,7 +750,7 @@ export function useCajaDiaria() {
     showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, clearArqueo, toast,
     deleteEgreso, deleteIngreso,
     // Daily calcs
-    cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
+    cuotasHoy, otrosHoy, merchHoy, federacionHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy,
     allDayItems, allMonthItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,

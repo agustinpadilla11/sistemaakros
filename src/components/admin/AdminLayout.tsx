@@ -16,7 +16,7 @@ export default function AdminLayout() {
     { to: '/admin/cuotas', icon: DollarSign, label: 'Cuotas' },
 
     { to: '/admin/federacion', icon: CheckSquare, label: 'Federación' },
-    { to: '/admin/matricula', icon: Receipt, label: 'Matrícula' },
+    { to: '/admin/matricula', icon: Receipt, label: 'Inscripción' },
     { to: '/admin/seguro', icon: ShieldCheck, label: 'Seguro' },
     { to: '/admin/torneos', icon: Trophy, label: 'Torneos' },
     { to: '/admin/apto-fisico', icon: HeartPulse, label: 'Apto Físico' },

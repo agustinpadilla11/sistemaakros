@@ -133,9 +133,9 @@ export default function Matricula() {
     worksheet['!cols'] = wscols;
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'MATRICULAS');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'INSCRIPCIONES');
     
-    const fileName = `Matriculas_${MESES[currentMonthDate.getMonth()]}_${currentMonthDate.getFullYear()}.xlsx`;
+    const fileName = `Inscripciones_${MESES[currentMonthDate.getMonth()]}_${currentMonthDate.getFullYear()}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   };
 
@@ -161,7 +161,7 @@ export default function Matricula() {
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <h1 className="text-sm font-bold uppercase tracking-tight flex items-center gap-2">
            <Award className="w-5 h-5 text-blue-600" />
-           Matrícula
+           Inscripción
         </h1>
       </div>
 
@@ -193,14 +193,14 @@ export default function Matricula() {
           }}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-blue-700 transition-colors shadow-sm"
         >
-          <Plus className="w-3 h-3" /> Cobrar Matrícula
+          <Plus className="w-3 h-3" /> Cobrar Inscripción
         </button>
       </div>
 
       {isEditing && (
         <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-          <h2 className="text-sm font-black uppercase tracking-tight mb-4 text-blue-900">{isEditing === 'nuevo' ? 'Registrar' : 'Editar'} Cobro de Matrícula</h2>
+          <h2 className="text-sm font-black uppercase tracking-tight mb-4 text-blue-900">{isEditing === 'nuevo' ? 'Registrar' : 'Editar'} Cobro de Inscripción</h2>
           <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="relative">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gimnasta</label>

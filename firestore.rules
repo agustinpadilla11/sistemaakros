@@ -235,6 +235,12 @@ service cloud.firestore {
     match /torneos_pagos/{docId} {
       allow read, write: if isAdmin();
     }
+    match /federacion_lista/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /federacion_pagos/{docId} {
+      allow read, write: if isAdmin();
+    }
     match /federacion_licencias/{docId} {
       allow read, write: if isAdmin();
     }

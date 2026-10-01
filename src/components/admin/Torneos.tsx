@@ -37,7 +37,7 @@ export default function Torneos() {
       setAlumnas(aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(a => a.estado !== 'inactiva').sort((a: any, b: any) => (a.nombre_completo || '').localeCompare(b.nombre_completo || '')));
 
       const tSnap = await getDocs(collection(db, 'torneos_lista'));
-      const tList = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const tList = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(t => t.tipo !== 'federacion');
       setTorneos(tList);
 
       const pSnap = await getDocs(collection(db, 'torneos_pagos'));
@@ -46,8 +46,8 @@ export default function Torneos() {
         let dateObj = new Date();
         if (d.fecha?.toDate) dateObj = d.fecha.toDate();
         else if (d.fecha) dateObj = new Date(d.fecha);
-        return { id: doc.id, ...d, dateObj };
-      }));
+        return { id: doc.id, ...d, dateObj } as any;
+      }).filter(p => p.tipo !== 'federacion'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -308,7 +308,7 @@ export default function Torneos() {
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
-                <h2 className="text-sm font-black uppercase tracking-tight mb-6 text-slate-800">{isEditingPago === 'nuevo' ? 'Registrar' : 'Editar'} Pago - {selectedTorneo.nombre}</h2>
+                <h2 className="text-sm font-black uppercase tracking-tight mb-6 text-slate-800">{isEditingPago === 'nuevo' ? 'Agregar Gimnasta' : 'Cargar Pago'} - {selectedTorneo.nombre}</h2>
                 <form onSubmit={handleSavePago} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gimnasta</label>
@@ -320,17 +320,19 @@ export default function Torneos() {
                         placeholder="Buscar por nombre..."
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto ($)</label>
-                      <input type="text" required value={pagoForm.monto} onChange={e=>setPagoForm({...pagoForm, monto: e.target.value.replace(/[^0-9,.]/g, '')})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="0.00" />
-                    </div>
+                    {isEditingPago !== 'nuevo' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto ($)</label>
+                        <input type="text" required value={pagoForm.monto} onChange={e=>setPagoForm({...pagoForm, monto: e.target.value.replace(/[^0-9,.]/g, '')})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="0.00" />
+                      </div>
+                    )}
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha</label>
                       <input type="date" required value={pagoForm.fecha} onChange={e=>setPagoForm({...pagoForm, fecha: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" />
                     </div>
                     <div className="md:col-span-2 flex gap-3 justify-end mt-6 pt-4 border-t border-slate-100">
                       <button type="button" onClick={()=>setIsEditingPago(null)} className="px-6 py-2.5 bg-slate-100 rounded-xl text-slate-600 text-[10px] uppercase font-bold hover:bg-slate-200">Cancelar</button>
-                      <button type="submit" className="px-8 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] uppercase font-bold hover:bg-amber-700 shadow-md">Guardar Pago</button>
+                      <button type="submit" className="px-8 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] uppercase font-bold hover:bg-amber-700 shadow-md">{isEditingPago === 'nuevo' ? 'Agregar a Lista' : 'Guardar Pago'}</button>
                     </div>
                 </form>
               </div>

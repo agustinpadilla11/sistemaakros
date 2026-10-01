@@ -42,10 +42,15 @@ export default function Alumnas() {
       // Optimistic UI state update
       setAlumnas(prev => prev.map(a => a.id === id ? { ...a, estado: nuevoEstado, grupo_id: nuevoEstado === 'inactiva' ? '' : a.grupo_id } : a));
 
+      const alumnaActual = alumnas.find(a => a.id === id);
       const updateData: any = { estado: nuevoEstado };
+      
       if (nuevoEstado === 'inactiva') {
         updateData.grupo_id = '';
+      } else if (nuevoEstado === 'activa' && alumnaActual?.estado === 'inactiva') {
+        updateData.creado_en = new Date();
       }
+      
       await updateDoc(doc(db, 'alumnas', id), updateData);
       
       if (nuevoEstado === 'inactiva') {
@@ -121,7 +126,11 @@ export default function Alumnas() {
         return {
           monthLabel: monthName,
           key,
-          list: groups[key].sort((x, y) => (x.nombre_completo || '').localeCompare(y.nombre_completo || ''))
+          list: groups[key].sort((x, y) => {
+            const dateX = x.creado_en?.toDate ? x.creado_en.toDate() : new Date(x.creado_en);
+            const dateY = y.creado_en?.toDate ? y.creado_en.toDate() : new Date(y.creado_en);
+            return dateY.getTime() - dateX.getTime();
+          })
         };
       });
   };
@@ -155,9 +164,30 @@ export default function Alumnas() {
         return {
           monthLabel: monthName,
           key,
-          list: groups[key].sort((x, y) => (x.alumna_nombre || '').localeCompare(y.alumna_nombre || ''))
+          list: groups[key].sort((x, y) => {
+            const dateX = x.fecha?.toDate ? x.fecha.toDate() : new Date(x.fecha);
+            const dateY = y.fecha?.toDate ? y.fecha.toDate() : new Date(y.fecha);
+            return dateY.getTime() - dateX.getTime();
+          })
         };
       });
+  };
+
+  const exportAltasExcel = (altasParaExportar: any[], monthLabel: string) => {
+    const dataToExport = altasParaExportar.map(a => {
+      const date = a.creado_en?.toDate ? a.creado_en.toDate() : new Date(a.creado_en);
+      return {
+        'Nombre Completo': a.nombre_completo,
+        'DNI': a.dni,
+        'Día de Alta': date.toLocaleDateString('es-AR')
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Altas");
+    worksheet['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 20 }];
+    XLSX.writeFile(workbook, `Altas_Gimnastas_${monthLabel.replace(/ /g, '_')}.xlsx`);
   };
 
   const exportBajasExcel = (bajasParaExportar: any[], monthLabel: string) => {
@@ -165,7 +195,6 @@ export default function Alumnas() {
       const date = b.fecha?.toDate ? b.fecha.toDate() : new Date(b.fecha);
       return {
         'Nombre Completo': b.alumna_nombre,
-        'Grupo al que pertenecía': b.grupo_nombre + (b.grupo_horario ? ` (${b.grupo_horario})` : ''),
         'Día de Baja (Real)': date.toLocaleDateString('es-AR')
       };
     });
@@ -173,7 +202,7 @@ export default function Alumnas() {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Bajas");
-    worksheet['!cols'] = [{ wch: 30 }, { wch: 45 }, { wch: 20 }];
+    worksheet['!cols'] = [{ wch: 30 }, { wch: 20 }];
     XLSX.writeFile(workbook, `Bajas_Gimnastas_${monthLabel.replace(/ /g, '_')}.xlsx`);
   };
 
@@ -450,9 +479,17 @@ export default function Alumnas() {
           ) : (
             getAltasPorMes().map(group => (
               <div key={group.key} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-purple-50/50 flex justify-between items-center">
-                  <h3 className="text-xs font-black uppercase text-purple-900 tracking-wider">{group.monthLabel}</h3>
-                  <span className="text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">{group.list.length} ALTAS</span>
+                <div className="p-4 border-b border-slate-100 bg-purple-50/50 flex justify-between items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <h3 className="text-xs font-black uppercase text-purple-900 tracking-wider">{group.monthLabel}</h3>
+                    <span className="text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full whitespace-nowrap">{group.list.length} ALTAS</span>
+                  </div>
+                  <button 
+                    onClick={() => exportAltasExcel(group.list, group.monthLabel)}
+                    className="flex text-center bg-green-50 text-green-700 px-3 py-1.5 rounded text-[9px] font-bold uppercase tracking-wide hover:bg-green-100 transition-colors border border-green-200 items-center justify-center gap-1 whitespace-nowrap shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Exportar
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -522,7 +559,10 @@ export default function Alumnas() {
                             <td className="px-6 py-4 text-xs font-black uppercase text-slate-800">{b.alumna_nombre}</td>
                             <td className="px-6 py-4 text-xs font-bold text-slate-500">{b.alumna_dni || 'S/D'}</td>
                             <td className="px-6 py-4 text-xs font-bold text-purple-600 uppercase">{b.grupo_nombre} {b.grupo_horario ? `(${b.grupo_horario})` : ''}</td>
-                            <td className="px-6 py-4 text-xs text-slate-400">{date.toLocaleDateString('es-AR')}</td>
+                            <td className={`px-6 py-4 text-xs font-bold ${date.getDate() >= 21 ? 'text-red-600' : 'text-slate-400'}`}>
+                              {date.toLocaleDateString('es-AR')}
+                              {date.getDate() >= 21 && <span className="ml-2 text-[9px] bg-red-100 text-red-600 px-1 py-0.5 rounded uppercase">Día 21+</span>}
+                            </td>
                           </tr>
                         );
                       })}

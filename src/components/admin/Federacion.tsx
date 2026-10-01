@@ -1,46 +1,34 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { Plus, Edit, Trash2, CheckSquare, Calendar, ChevronLeft, ChevronRight, Download, Search, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Trophy, Search, FileUp, Printer, Download, UserPlus, Users, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useAuth } from '../../hooks/useAuth';
-
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 export default function Federacion() {
-  const { userData } = useAuth();
-
-  // ─── Todos los hooks PRIMERO (regla de React: no llamar hooks después de return) ───
-  const [activeTab, setActiveTab] = useState<'licencias' | 'inscripciones'>('licencias');
   const [loading, setLoading] = useState(true);
+  const [federaciones, setFederaciones] = useState<any[]>([]);
+  const [pagos, setPagos] = useState<any[]>([]);
   const [alumnas, setAlumnas] = useState<any[]>([]);
-  const [data, setData] = useState<any[]>([]);
   
-  const [currentMonthDate, setCurrentMonthDate] = useState(() => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
+  const [isEditingFederacion, setIsEditingFederacion] = useState<any>(null);
+  const [isEditingPago, setIsEditingPago] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFederacion, setSelectedFederacion] = useState<any>(null);
+
+  const [federacionForm, setFederacionForm] = useState({
+    nombre: '',
+    lugar: '',
+    fecha: new Date().toISOString().split('T')[0]
   });
 
-  const [isEditing, setIsEditing] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  // Fecha local (no UTC) para evitar que el día quede un día atrás en Argentina (UTC-3)
-  const getTodayLocal = () => {
-    const t = new Date();
-    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-  };
-
-  const [form, setForm] = useState({
+  const [pagoForm, setPagoForm] = useState({
     alumna_nombre: '',
+    federacion_id: '',
+    categoria: '',
     monto: '',
     metodo: 'efectivo',
-    fecha: getTodayLocal(),
-    notas: ''
+    fecha: new Date().toISOString().split('T')[0]
   });
-
-  // Early return DESPUÉS de todos los hooks
-  if (!userData) return null;
 
   const loadData = async () => {
     setLoading(true);
@@ -48,17 +36,18 @@ export default function Federacion() {
       const aSnap = await getDocs(collection(db, 'alumnas'));
       setAlumnas(aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(a => a.estado !== 'inactiva').sort((a: any, b: any) => (a.nombre_completo || '').localeCompare(b.nombre_completo || '')));
 
-      const collectionName = activeTab === 'licencias' ? 'federacion_licencias' : 'federacion_inscripciones';
-      const dSnap = await getDocs(collection(db, collectionName));
-      const docs = dSnap.docs.map(doc => {
+      const tSnap = await getDocs(collection(db, 'torneos_lista'));
+      const tList = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })).filter(t => t.tipo === 'federacion');
+      setFederaciones(tList);
+
+      const pSnap = await getDocs(collection(db, 'torneos_pagos'));
+      setPagos(pSnap.docs.map(doc => {
         const d = doc.data();
         let dateObj = new Date();
         if (d.fecha?.toDate) dateObj = d.fecha.toDate();
         else if (d.fecha) dateObj = new Date(d.fecha);
-        return { id: doc.id, ...d, dateObj };
-      });
-      docs.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
-      setData(docs);
+        return { id: doc.id, ...d, dateObj } as any;
+      }).filter(p => p.tipo === 'federacion'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -66,279 +55,367 @@ export default function Federacion() {
     }
   };
 
-  useEffect(() => { loadData(); }, [activeTab]);
+  useEffect(() => { loadData(); }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveFederacion = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const collectionName = activeTab === 'licencias' ? 'federacion_licencias' : 'federacion_inscripciones';
-      
-      // Parseo robusto del monto
-      const cleanedMonto = form.monto.replace(',', '.');
-      const parsedMonto = parseFloat(cleanedMonto) || 0;
-
-      // Parsear fecha como hora LOCAL (no UTC) para evitar el corrimiento de zona horaria en Argentina
-      const [year, month, day] = form.fecha.split('-').map(Number);
-      const fechaLocal = new Date(year, month - 1, day); // medianoche local
-
-      const payload = {
-        alumna_nombre: form.alumna_nombre.toUpperCase(),
-        monto: parsedMonto,
-        metodo: form.metodo,
-        fecha: fechaLocal,
-        notas: form.notas,
-        tipo: activeTab === 'licencias' ? 'licencia' : 'inscripcion'
-      };
-
-      if (isEditing === 'nuevo') {
-        const newRef = doc(collection(db, collectionName));
-        await setDoc(newRef, { id: newRef.id, ...payload });
+      if (isEditingFederacion === 'nuevo') {
+        const newRef = doc(collection(db, 'torneos_lista'));
+        await setDoc(doc(db, 'torneos_lista', 'fed_' + newRef.id), { id: 'fed_' + newRef.id, ...federacionForm, tipo: 'federacion' });
       } else {
-        await updateDoc(doc(db, collectionName, isEditing.id), payload);
+        await updateDoc(doc(db, 'torneos_lista', isEditingFederacion.id), federacionForm);
       }
-      setIsEditing(null);
+      setIsEditingFederacion(null);
       loadData();
-    } catch (err: any) {
-      console.error('Error al guardar:', err);
-      const msg = err?.code === 'permission-denied'
-        ? 'Sin permisos: asegurate de estar logueado como administrador.'
-        : 'Error al guardar: ' + (err?.message || err);
-      alert(msg);
+    } catch (err: any) { 
+      console.error(err); 
+      alert('Error al guardar federacion: ' + err.message);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este registro?')) return;
+  const handleSavePago = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const collectionName = activeTab === 'licencias' ? 'federacion_licencias' : 'federacion_inscripciones';
-      await deleteDoc(doc(db, collectionName, id));
+      const parsedMonto = typeof pagoForm.monto === 'string' 
+        ? parseFloat(pagoForm.monto.replace(',', '.')) 
+        : parseFloat(pagoForm.monto);
+      
+      const payload = {
+        ...pagoForm,
+        alumna_nombre: (pagoForm.alumna_nombre || 'S/N').toString().toUpperCase(),
+        categoria: (pagoForm.categoria || '').toString().toUpperCase(),
+        federacion_id: selectedFederacion.id,
+        monto: parsedMonto || 0,
+        fecha: new Date(pagoForm.fecha + 'T12:00:00'),
+        tipo: 'federacion'
+      };
+      if (isEditingPago === 'nuevo') {
+        const newRef = doc(collection(db, 'torneos_pagos'));
+        await setDoc(doc(db, 'torneos_pagos', 'fedp_' + newRef.id), { ...payload, id: 'fedp_' + newRef.id, tipo: 'federacion' });
+      } else {
+        await updateDoc(doc(db, 'torneos_pagos', isEditingPago.id), payload);
+      }
+      setIsEditingPago(null);
       loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) { 
+      console.error(err); 
+      alert('Error al guardar pago: ' + err.message);
     }
   };
 
-  const exportToExcel = () => {
-    const filteredData = data.filter(d => 
-      d.dateObj.getMonth() === currentMonthDate.getMonth() && 
-      d.dateObj.getFullYear() === currentMonthDate.getFullYear()
-    );
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedFederacion) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data: any[] = XLSX.utils.sheet_to_json(ws);
+      
+      if (confirm(`¿Importar ${data.length} registros a esta federación? (Solo se tomarán los nombres)`)) {
+        for (const item of data) {
+           const firstValue = Object.values(item)[0];
+           const name = (item.Nombre || item['Nombre y Apellido'] || item.nombre_completo || item.nombre || firstValue || 'S/N').toString().toUpperCase();
 
-    const worksheetData = filteredData.map(d => ({
-      'Fecha': d.dateObj.toLocaleDateString('es-AR'),
-      'Gimnasta': d.alumna_nombre,
-      'Monto': d.monto,
-      'Medio de Pago': d.metodo.toUpperCase(),
-      'Tipo': activeTab === 'licencias' ? 'LICENCIA' : 'INSCRIPCION',
-      'Notas': d.notas || ''
-    }));
-
-    // Add a summary row
-    const total = filteredData.reduce((acc, d) => acc + d.monto, 0);
-    worksheetData.push({
-      'Fecha': 'TOTAL',
-      'Gimnasta': '',
-      'Monto': total,
-      'Medio de Pago': '',
-      'Tipo': '',
-      'Notas': ''
-    } as any);
-
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    
-    // Set column widths
-    const wscols = [
-      {wch: 15}, // Fecha
-      {wch: 30}, // Gimnasta
-      {wch: 12}, // Monto
-      {wch: 20}, // Medio
-      {wch: 15}, // Tipo
-      {wch: 40}  // Notas
-    ];
-    worksheet['!cols'] = wscols;
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, activeTab.toUpperCase());
-    
-    const fileName = `Federacion_${activeTab}_${MESES[currentMonthDate.getMonth()]}_${currentMonthDate.getFullYear()}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+           const newRef = doc(collection(db, 'torneos_pagos'));
+           await setDoc(doc(db, 'torneos_pagos', 'fedp_' + newRef.id), {
+             id: 'fedp_' + newRef.id,
+             alumna_nombre: name,
+             federacion_id: selectedFederacion.id,
+             categoria: '',
+             monto: 0,
+             metodo: 'efectivo',
+             fecha: null,
+             estado: 'pendiente',
+             tipo: 'federacion'
+           });
+        }
+        alert('Importación finalizada');
+        loadData();
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
-  const changeMonth = (delta: number) => {
-    setCurrentMonthDate(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() + delta);
-      return newDate;
-    });
+  const handlePrint = (federacionId: string) => {
+    const federacion = federaciones.find(t => t.id === federacionId);
+    const participantes = pagos.filter(p => p.federacion_id === federacionId);
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Lista de Federacion - ${federacion?.nombre}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #1e293b; }
+            h1 { text-transform: uppercase; font-size: 24px; margin-bottom: 5px; }
+            h2 { font-size: 14px; color: #64748b; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+            th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+            th { background: #f8fafc; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+            td { font-size: 12px; font-weight: bold; }
+            .header { border-bottom: 2px solid #1e293b; padding-bottom: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${federacion?.nombre}</h1>
+            <h2>Lugar: ${federacion?.lugar} | Fecha: ${federacion?.fecha}</h2>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Gimnasta</th>
+                <th>Monto</th>
+                <th>Método</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${participantes.map((p, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td style="text-transform: uppercase;">${p.alumna_nombre}</td>
+                  <td>$${p.monto.toLocaleString('es-AR')}</td>
+                  <td style="text-transform: uppercase;">${p.metodo}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p style="margin-top: 30px; font-size: 10px; color: #94a3b8;">Generado por Sistema Akros - ${new Date().toLocaleString()}</p>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
-  const filteredData = data.filter(d => 
-    d.dateObj.getMonth() === currentMonthDate.getMonth() && 
-    d.dateObj.getFullYear() === currentMonthDate.getFullYear()
-  );
-
-  const filteredAlumnas = alumnas.filter(a => 
-    (a.nombre_completo || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const currentPagos = selectedFederacion 
+    ? pagos
+        .filter(p => p.federacion_id === selectedFederacion.id && p.alumna_nombre.includes(searchTerm.toUpperCase()))
+        .sort((a, b) => a.alumna_nombre.localeCompare(b.alumna_nombre))
+    : [];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <h1 className="text-sm font-bold uppercase tracking-tight flex items-center gap-2">
-           <CheckSquare className="w-5 h-5 text-purple-600" />
-           Federación
+           <Trophy className="w-5 h-5 text-amber-600" />
+           {selectedFederacion ? `Federacion: ${selectedFederacion.nombre}` : 'Federaciones'}
         </h1>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
-           <button 
-             onClick={()=>setActiveTab('licencias')} 
-             className={`px-4 py-2 rounded text-[10px] uppercase font-bold tracking-widest transition-colors ${activeTab === 'licencias' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
-           >
-             💳 Licencias
-           </button>
-           <button 
-             onClick={()=>setActiveTab('inscripciones')} 
-             className={`px-4 py-2 rounded text-[10px] uppercase font-bold tracking-widest transition-colors ${activeTab === 'inscripciones' ? 'bg-white shadow-sm text-purple-700' : 'text-slate-500 hover:text-slate-700'}`}
-           >
-             📝 Inscripciones
-           </button>
-        </div>
+        {selectedFederacion && (
+          <button onClick={() => setSelectedFederacion(null)} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 text-[10px] font-bold uppercase tracking-widest bg-slate-100 px-3 py-1.5 rounded transition-all">
+            <ChevronLeft className="w-4 h-4" /> Volver a la Lista
+          </button>
+        )}
       </div>
 
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-4">
-           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg shadow-inner border border-slate-200/60">
-              <button onClick={() => changeMonth(-1)} className="p-1.5 hover:bg-white rounded transition-colors text-slate-600">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wide min-w-[120px] text-center">
-                {MESES[currentMonthDate.getMonth()]} {currentMonthDate.getFullYear()}
-              </span>
-              <button onClick={() => changeMonth(1)} className="p-1.5 hover:bg-white rounded transition-colors text-slate-600">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-           </div>
-           <button 
-             onClick={exportToExcel}
-             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-emerald-700 transition-colors shadow-sm"
-           >
-             <Download className="w-3 h-3" /> Exportar Excel
-           </button>
-        </div>
-        <button 
-          onClick={() => { 
-            setForm({alumna_nombre: '', monto: '', metodo: 'efectivo', fecha: getTodayLocal(), notas: ''}); 
-            setSearchTerm('');
-            setIsEditing('nuevo'); 
-          }}
-          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wide hover:bg-purple-700 transition-colors shadow-sm"
-        >
-          <Plus className="w-3 h-3" /> Nuevo Registro
-        </button>
-      </div>
+      <datalist id="federacion-alumnas-datalist">
+        {alumnas.map(a => <option key={a.id} value={a.nombre_completo} />)}
+      </datalist>
 
-      {isEditing && (
-        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
-          <h2 className="text-sm font-black uppercase tracking-tight mb-4 text-purple-900">{isEditing === 'nuevo' ? 'Registrar' : 'Editar'} {activeTab === 'licencias' ? 'Licencia' : 'Inscripción'}</h2>
-          <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="relative">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gimnasta</label>
-              <div className="relative">
-                <input 
-                  list="alumnas-list"
-                  type="text" 
-                  required 
-                  value={form.alumna_nombre} 
-                  onChange={e => setForm({...form, alumna_nombre: e.target.value})}
-                  className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500 uppercase pr-10" 
-                  placeholder="Nombre de la gimnasta..."
-                />
-                <datalist id="alumnas-list">
-                  {alumnas.map(a => (
-                    <option key={a.id} value={a.nombre_completo} />
-                  ))}
-                </datalist>
-                <Users className="absolute right-3 top-3 w-4 h-4 text-slate-400" />
+      {!selectedFederacion ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {federaciones.map(t => (
+              <div key={t.id} onClick={() => setSelectedFederacion(t)} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group cursor-pointer relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-3">
+                   <div className="flex gap-1">
+                      <button onClick={(e)=> { e.stopPropagation(); setFederacionForm({nombre: t.nombre, lugar: t.lugar, fecha: t.fecha}); setIsEditingFederacion(t); }} className="p-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"><Edit className="w-4 h-4" /></button>
+                      <button onClick={async (e)=>{ e.stopPropagation(); if(confirm('¿Eliminar federacion?')) { await deleteDoc(doc(db, 'torneos_lista', t.id)); loadData(); }}} className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded transition-all"><Trash2 className="w-4 h-4" /></button>
+                   </div>
+                </div>
+                <div className="bg-amber-50 p-3 rounded-xl w-fit mb-4 group-hover:bg-amber-100 transition-colors">
+                  <Trophy className="w-6 h-6 text-amber-600" />
+                </div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-800 mb-1">{t.nombre}</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-4">{t.fecha}</p>
+                <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                   Ver Detalles <ChevronRight className="w-3 h-3" />
+                </div>
+              </div>
+            ))}
+            
+            {/* Create Button at the end */}
+            <button 
+              onClick={() => { setFederacionForm({nombre: 'Federación 2027', lugar: '', fecha: new Date().toISOString().split('T')[0]}); setIsEditingFederacion('nuevo'); }}
+              className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-amber-400 hover:text-amber-600 hover:bg-amber-50/30 transition-all min-h-[160px]"
+            >
+              <Plus className="w-8 h-8" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Nueva Federación</span>
+            </button>
+          </div>
+
+          {isEditingFederacion && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+                <h2 className="text-sm font-black uppercase tracking-tight mb-6 text-slate-800">{isEditingFederacion === 'nuevo' ? 'Nueva' : 'Editar'} Federación</h2>
+                <form onSubmit={handleSaveFederacion} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Nombre de la Federación</label>
+                      <input type="text" required value={federacionForm.nombre} onChange={e=>setFederacionForm({...federacionForm, nombre: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 uppercase" placeholder="Ej: Provincial Federativo" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha</label>
+                      <input type="date" required value={federacionForm.fecha} onChange={e=>setFederacionForm({...federacionForm, fecha: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" />
+                    </div>
+                    <div className="flex gap-3 justify-end mt-6">
+                      <button type="button" onClick={()=>setIsEditingFederacion(null)} className="px-6 py-2.5 bg-slate-100 rounded-xl text-slate-600 text-[10px] uppercase font-bold hover:bg-slate-200 transition-colors">Cancelar</button>
+                      <button type="submit" className="px-8 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] uppercase font-bold hover:bg-amber-700 transition-all shadow-md shadow-amber-200">Guardar Federación</button>
+                    </div>
+                </form>
               </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto ($)</label>
-              <input type="text" inputMode="numeric" required value={form.monto} onChange={e=>setForm({...form, monto: e.target.value.replace(/[^0-9.]/g, '')})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500" placeholder="0" />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Recaudado</p>
+                <p className="text-xl font-black text-amber-700">${currentPagos.reduce((a,b)=>a+b.monto, 0).toLocaleString('es-AR')}</p>
+             </div>
+             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Inscriptos</p>
+                <p className="text-xl font-black text-slate-800">{currentPagos.length}</p>
+             </div>
+             <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <input type="file" onChange={handleImportExcel} className="hidden" id="excel-import" />
+                  <label htmlFor="excel-import" className="h-full flex flex-col items-center justify-center gap-1 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-100 transition-colors border border-emerald-200 cursor-pointer">
+                    <FileUp className="w-5 h-5" /> Importar Excel
+                  </label>
+                </div>
+                <button onClick={()=>handlePrint(selectedFederacion.id)} className="flex-1 flex flex-col items-center justify-center gap-1 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-100 transition-colors border border-slate-200">
+                  <Printer className="w-5 h-5" /> Imprimir
+                </button>
+             </div>
+          </div>
+
+          {isEditingPago && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+                <h2 className="text-sm font-black uppercase tracking-tight mb-6 text-slate-800">{isEditingPago === 'nuevo' ? 'Agregar Gimnasta' : 'Cargar Pago'} - {selectedFederacion.nombre}</h2>
+                <form onSubmit={handleSavePago} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gimnasta</label>
+                      <input 
+                        type="text" list="federacion-alumnas-datalist" required 
+                        value={pagoForm.alumna_nombre} 
+                        onChange={e=>setPagoForm({...pagoForm, alumna_nombre: e.target.value})}
+                        className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 uppercase" 
+                        placeholder="Buscar por nombre..."
+                      />
+                    </div>
+                    {isEditingPago !== 'nuevo' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Monto ($)</label>
+                        <input type="text" required value={pagoForm.monto} onChange={e=>setPagoForm({...pagoForm, monto: e.target.value.replace(/[^0-9,.]/g, '')})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" placeholder="0.00" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha</label>
+                      <input type="date" required value={pagoForm.fecha} onChange={e=>setPagoForm({...pagoForm, fecha: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-3 rounded-xl outline-none focus:ring-2 focus:ring-amber-500" />
+                    </div>
+                    <div className="md:col-span-2 flex gap-3 justify-end mt-6 pt-4 border-t border-slate-100">
+                      <button type="button" onClick={()=>setIsEditingPago(null)} className="px-6 py-2.5 bg-slate-100 rounded-xl text-slate-600 text-[10px] uppercase font-bold hover:bg-slate-200">Cancelar</button>
+                      <button type="submit" className="px-8 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] uppercase font-bold hover:bg-amber-700 shadow-md">{isEditingPago === 'nuevo' ? 'Agregar a Lista' : 'Guardar Pago'}</button>
+                    </div>
+                </form>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Método de Pago</label>
-              <select required value={form.metodo} onChange={e=>setForm({...form, metodo: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold uppercase border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500">
-                <option value="efectivo">Efectivo</option>
-                <option value="debito">Débito</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
+          )}
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <h3 className="text-sm font-bold uppercase tracking-tight text-slate-800">Participantes</h3>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="text"
+                    placeholder="Buscar (A-Z)..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    setPagoForm({
+                      alumna_nombre: '', 
+                      federacion_id: selectedFederacion.id, 
+                      categoria: '', 
+                      monto: '', 
+                      metodo: 'efectivo', 
+                      fecha: new Date().toISOString().split('T')[0]
+                    });
+                    setIsEditingPago('nuevo');
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1 transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Plus className="w-4 h-4" /> Agregar
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha</label>
-              <input type="date" required value={form.fecha} onChange={e=>setForm({...form, fecha: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500" />
-            </div>
-            <div className="lg:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Notas / Observaciones</label>
-              <input type="text" value={form.notas} onChange={e=>setForm({...form, notas: e.target.value})} className="w-full bg-slate-50 border-slate-200 text-xs font-bold border p-2.5 rounded outline-none focus:ring-purple-500 focus:border-purple-500" placeholder="Opcional..." />
-            </div>
-            
-            <div className="lg:col-span-3 flex gap-3 justify-end mt-4 pt-4 border-t border-slate-100">
-              <button type="button" onClick={() => setIsEditing(null)} className="px-6 py-2 bg-slate-100 rounded text-slate-600 text-[10px] uppercase font-bold tracking-widest hover:bg-slate-200 transition-colors">Cancelar</button>
-              <button type="submit" className="px-8 py-2 bg-purple-600 text-white rounded shadow-sm text-[10px] uppercase font-bold tracking-widest hover:bg-purple-700 transition-colors">Guardar</button>
-            </div>
-          </form>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-b border-slate-200 font-black">
+                  <th className="px-6 py-4">Gimnasta</th>
+                  <th className="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {currentPagos.length === 0 ? (
+                  <tr><td colSpan={2} className="px-6 py-12 text-center text-xs text-slate-400 font-bold uppercase">Sin participantes registrados</td></tr>
+                ) : (
+                  currentPagos.map(p => (
+                    <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.monto > 0 ? 'bg-emerald-50/40' : ''}`}>
+                      <td className="px-6 py-4 text-sm font-black text-slate-800 uppercase flex items-center gap-2">
+                        {p.monto > 0 && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                        {p.alumna_nombre}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-3 text-slate-400 items-center">
+                          {(!p.monto || p.monto === 0) ? (
+                            <button 
+                              onClick={()=>{setPagoForm({alumna_nombre: p.alumna_nombre, federacion_id: p.federacion_id, categoria: '', monto: '', metodo: 'efectivo', fecha: new Date().toISOString().split('T')[0]}); setIsEditingPago(p);}} 
+                              className="text-[10px] uppercase font-black bg-amber-100 text-amber-700 px-4 py-2 rounded-lg hover:bg-amber-200 transition-colors whitespace-nowrap shadow-sm"
+                            >
+                              Cargar Pago
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-4 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                              <div className="text-right">
+                                <span className="block text-xs font-black text-emerald-600">${p.monto.toLocaleString('es-AR')}</span>
+                                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.dateObj ? p.dateObj.toLocaleDateString('es-AR') : ''}</span>
+                              </div>
+                              <div className="flex items-center gap-2 border-l border-slate-100 pl-3">
+                                <button onClick={()=>{setPagoForm({alumna_nombre: p.alumna_nombre, federacion_id: p.federacion_id, categoria: '', monto: p.monto.toString(), metodo: p.metodo, fecha: p.fecha ? p.dateObj.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}); setIsEditingPago(p);}} className="hover:text-amber-600 text-slate-400 p-1.5 hover:bg-slate-50 rounded transition-colors"><Edit className="w-4 h-4" /></button>
+                                <button onClick={async ()=>{if(confirm('¿Eliminar registro?')) { await deleteDoc(doc(db, 'torneos_pagos', p.id)); loadData(); }}} className="hover:text-red-600 text-slate-400 p-1.5 hover:bg-slate-50 rounded transition-colors"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            </div>
+                          )}
+                          {(!p.monto || p.monto === 0) && (
+                            <button onClick={async ()=>{if(confirm('¿Eliminar registro?')) { await deleteDoc(doc(db, 'torneos_pagos', p.id)); loadData(); }}} className="hover:text-red-600 p-2"><Trash2 className="w-4 h-4" /></button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
-
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 font-black">Fecha</th>
-                <th className="px-6 py-4 font-black">Gimnasta</th>
-                <th className="px-6 py-4 font-black">Monto</th>
-                <th className="px-6 py-4 font-black">Método</th>
-                <th className="px-6 py-4 font-black">Notas</th>
-                <th className="px-6 py-4 font-black text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-xs text-slate-500 font-bold uppercase">Cargando...</td></tr>
-              ) : filteredData.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">No hay registros para este mes</td></tr>
-              ) : (
-                filteredData.map(d => (
-                  <tr key={d.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-xs text-slate-600 font-bold">{d.dateObj.toLocaleDateString('es-AR')}</td>
-                    <td className="px-6 py-4 text-xs font-black text-slate-800 uppercase">{d.alumna_nombre}</td>
-                    <td className="px-6 py-4 text-sm font-black text-purple-700">${d.monto.toLocaleString('es-AR')}</td>
-                    <td className="px-6 py-4"><span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-1 rounded">{d.metodo}</span></td>
-                    <td className="px-6 py-4 text-xs text-slate-400 italic">{d.notas || '-'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-3 text-slate-400">
-                        <button onClick={() => {
-                          setForm({
-                            alumna_nombre: d.alumna_nombre,
-                            monto: d.monto.toString(),
-                            metodo: d.metodo,
-                            fecha: d.dateObj.toISOString().split('T')[0],
-                            notas: d.notas || ''
-                          });
-                          setSearchTerm(d.alumna_nombre);
-                          setIsEditing(d);
-                        }} className="hover:text-purple-600"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => handleDelete(d.id)} className="hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

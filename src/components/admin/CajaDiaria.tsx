@@ -21,7 +21,7 @@ export default function CajaDiaria() {
     cajaFormOpen, setCajaFormOpen, nuevoComienzo, setNuevoComienzo, handleUpdateCaja,
     showArqueo, setShowArqueo, efectivoReal, setEfectivoReal, entregadoDuena, setEntregadoDuena, arqueoData, handleArqueo, clearArqueo, toast,
     deleteEgreso, deleteIngreso,
-    cuotasHoy, otrosHoy, merchHoy, licenciasHoy, inscripcionesFedHoy,
+    cuotasHoy, otrosHoy, merchHoy, federacionHoy,
     matriculasHoy, segurosHoy, torneosPagosHoy, egresosHoy, allDayItems,
     totalIngEfvoHoy, ingDebitoHoy, ingTransfHoy,
     totalIngresosGralHoy, totalEgresosGralHoy,
@@ -411,9 +411,8 @@ export default function CajaDiaria() {
                     </div>
                     <button 
                       onClick={() => {
-                        const efvoTotalContado = comienzoCaja + totalIngEfvoHoy - totalRetirosSalidasEfvoHoy + (arqueoData?.entregado_duena || 0);
-                        setEfectivoReal(efvoTotalContado.toString());
-                        setEntregadoDuena(Math.max(0, efvoTotalContado - comienzoCaja).toString());
+                        setEfectivoReal(saldoActualCaja.toString());
+                        setEntregadoDuena('0');
                         setShowArqueo(true);
                       }} 
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -425,41 +424,41 @@ export default function CajaDiaria() {
                   // Display real saved numbers after Arqueo
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Total Efectivo Contado:</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Último Efectivo Contado:</span>
                       <span className="text-sm font-black text-slate-800">{formatter.format(arqueoData.real)}</span>
                     </div>
 
                     <div className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-center ${arqueoData.diferencia === 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : arqueoData.diferencia > 0 ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
-                      {arqueoData.diferencia === 0 ? '✔ Caja Perfecta' : arqueoData.diferencia > 0 ? `⚠ Sobran ${formatter.format(arqueoData.diferencia)}` : `❌ Faltan ${formatter.format(Math.abs(arqueoData.diferencia))}`}
+                      {arqueoData.diferencia === 0 ? '✔ Arqueo Perfecto' : arqueoData.diferencia > 0 ? `⚠ Sobraron ${formatter.format(arqueoData.diferencia)}` : `❌ Faltaron ${formatter.format(Math.abs(arqueoData.diferencia))}`}
                     </div>
 
                     <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Entregado a la Dueña:</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Total Entregado a Dueña (Día):</span>
                         <span className="text-sm font-black text-purple-700">{formatter.format(arqueoData.entregado_duena || 0)}</span>
                       </div>
                       <div className="flex justify-between items-center border-t border-slate-100 pt-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Quedó en la Caja:</span>
-                        <span className="text-sm font-black text-slate-700">{formatter.format(arqueoData.quedo_caja || 0)}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo actual estimado:</span>
+                        <span className="text-sm font-black text-slate-700">{formatter.format(saldoActualCaja)}</span>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-2 mt-2">
                       <button 
                         onClick={() => {
-                          setEfectivoReal(arqueoData.real.toString());
-                          setEntregadoDuena((arqueoData.entregado_duena || 0).toString());
+                          setEfectivoReal(saldoActualCaja.toString());
+                          setEntregadoDuena('0');
                           setShowArqueo(true);
                         }}
-                        className="w-full text-center text-[9px] font-black uppercase text-purple-600 hover:text-purple-800 underline tracking-widest block"
+                        className="w-full text-center text-[9px] font-black uppercase text-purple-600 hover:text-purple-800 underline tracking-widest block bg-purple-50 py-2 rounded"
                       >
-                        Volver a Arquear / Corregir
+                        Realizar Otro Arqueo
                       </button>
                       <button 
                         onClick={clearArqueo}
                         className="w-full text-center text-[9px] font-black uppercase text-red-500 hover:text-red-700 underline tracking-widest block"
                       >
-                        Limpiar Arqueo
+                        Limpiar Arqueos del Día
                       </button>
                     </div>
                   </div>
@@ -551,38 +550,32 @@ export default function CajaDiaria() {
                               </tr>
                             );
                           }
-                          case 'licencia': {
-                            const l = item as any;
+                          case 'federacion': {
+                            const f = item as any;
                             return (
-                              <tr key={`l-${l.id}`} className="hover:bg-slate-50 transition-colors">
+                              <tr key={`f-${f.id}`} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3">
-                                   <span className="block text-xs font-black text-slate-700">{l.alumna_nombre}</span>
-                                   <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5 bg-indigo-50 inline-block px-1.5 rounded">Licencia Fed</span>
+                                   <span className="block text-xs font-black text-slate-700">{f.alumna_nombre}</span>
+                                   <span className="block text-[10px] font-bold text-purple-600 uppercase tracking-widest mt-0.5 bg-purple-50 inline-block px-1.5 rounded">Federación</span>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(l)}`}>{l.metodo || l.metodo_pago || 'efectivo'}</span>
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(f)}`}>{f.metodo || f.metodo_pago || 'efectivo'}</span>
                                 </td>
-                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(l.monto)}</td>
+                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(f.monto)}</td>
                                 <td className="px-4 py-3 text-right">
-                                   <button onClick={()=>deleteIngreso(l.id, 'federacion_licencias')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                </td>
-                              </tr>
-                            );
-                          }
-                          case 'inscripcion': {
-                            const i = item as any;
-                            return (
-                              <tr key={`i-${i.id}`} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-4 py-3">
-                                   <span className="block text-xs font-black text-slate-700">{i.alumna_nombre}</span>
-                                   <span className="block text-[10px] font-bold text-sky-600 uppercase tracking-widest mt-0.5 bg-sky-50 inline-block px-1.5 rounded">Inscripción Fed</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(i)}`}>{i.metodo || i.metodo_pago || 'efectivo'}</span>
-                                </td>
-                                <td className="px-4 py-3 text-sm font-black text-emerald-600 text-right">{formatter.format(i.monto)}</td>
-                                <td className="px-4 py-3 text-right">
-                                   <button onClick={()=>deleteIngreso(i.id, 'federacion_inscripciones')} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                   <button onClick={async () => {
+                                     if (confirm('¿Seguro que deseas eliminar el pago? La gimnasta seguirá en la lista de federación pero sin el pago registrado.')) {
+                                       try {
+                                         const { doc, updateDoc } = await import('firebase/firestore');
+                                         const { db } = await import('../../firebase/config');
+                                         await updateDoc(doc(db, 'torneos_pagos', f.id), { monto: 0, fecha: null });
+                                         window.location.reload();
+                                       } catch (err) {
+                                         console.error(err);
+                                         alert('Error al eliminar pago de federación');
+                                       }
+                                     }
+                                   }} className="text-slate-300 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
                                 </td>
                               </tr>
                             );
@@ -593,7 +586,7 @@ export default function CajaDiaria() {
                               <tr key={`mat-${m.id}`} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3">
                                    <span className="block text-xs font-black text-slate-700">{m.alumna_nombre}</span>
-                                   <span className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest mt-0.5 bg-pink-50 inline-block px-1.5 rounded">Matrícula Anual</span>
+                                   <span className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest mt-0.5 bg-pink-50 inline-block px-1.5 rounded">Inscripción Anual</span>
                                 </td>
                                 <td className="px-4 py-3">
                                   <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${getMetodoBadgeStyle(m)}`}>{m.metodo || m.metodo_pago || 'efectivo'}</span>

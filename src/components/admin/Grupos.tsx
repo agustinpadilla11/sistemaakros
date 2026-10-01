@@ -56,6 +56,17 @@ export default function Grupos() {
   const [isEditing, setIsEditing] = useState<any>(null);
   const [managingGroup, setManagingGroup] = useState<any>(null);
   const [form, setForm] = useState({ nombre: '', horario: '', descripcion: '' });
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const getCategoryName = (name: string) => {
+    const n = (name || '').toUpperCase();
+    if (n.includes('JARDÍN') || n.includes('JARDIN')) return 'JARDÍN';
+    if (n.includes('INICIACIÓN') || n.includes('INICIACION')) return 'INICIACIÓN';
+    if (n.includes('FORMACIÓN') || n.includes('FORMACION') || n.includes('FORM')) return 'FORMACIÓN';
+    if (n.includes('DESARROLLO')) return 'DESARROLLO';
+    if (n.includes('RENDIMIENTO')) return 'RENDIMIENTO';
+    return 'OTROS';
+  };
 
   const [globalError, setGlobalError] = useState('');
   const [confirmarCarga, setConfirmarCarga] = useState(false);
@@ -439,6 +450,21 @@ export default function Grupos() {
       printWindow.document.close();
     } catch(err) { console.error(err); }
   };
+  const groupedGrupos = grupos.reduce((acc, g) => {
+    const cat = getCategoryName(g.nombre);
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(g);
+    return acc;
+  }, {} as Record<string, any[]>);
+  
+  const categoryOrder = ['JARDÍN', 'INICIACIÓN', 'FORMACIÓN', 'DESARROLLO', 'RENDIMIENTO', 'OTROS'];
+  const categoryKeys = Object.keys(groupedGrupos).sort((a, b) => {
+    let ia = categoryOrder.indexOf(a);
+    let ib = categoryOrder.indexOf(b);
+    if (ia === -1) ia = 99;
+    if (ib === -1) ib = 99;
+    return ia - ib;
+  });
 
   return (
     <div className="space-y-8">
@@ -500,38 +526,67 @@ export default function Grupos() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {loading ? <p className="text-xs font-bold uppercase text-slate-400">Cargando...</p> : grupos.map(g => (
-              <div key={g.id} className="bg-white flex flex-col p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-purple-300 transition-all group">
-                <div className="flex justify-between items-start">
-                  <h3 className="text-sm font-black uppercase tracking-tight px-3 py-1 rounded bg-purple-50 text-purple-900">{g.nombre}</h3>
-                  <div className="flex gap-2 transition-opacity">
-                    <button onClick={() => handleVaciarGrupo(g.id)} title="Vaciar Grupo" className="text-slate-400 hover:text-amber-600 transition-colors">
-                       <UserMinus className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => { setIsEditing(g); setForm(g); }} className="text-slate-400 hover:text-purple-600"><Edit className="w-4 h-4" /></button>
-                    {deleteConfirmId === g.id ? (
-                      <div className="flex gap-1 items-center bg-red-50 p-1 rounded">
-                        <button onClick={() => handleDelete(g.id, true)} className="bg-red-600 text-white text-[8px] px-2 py-1 rounded font-black uppercase">SÍ</button>
-                        <button onClick={() => setDeleteConfirmId(null)} className="bg-slate-200 text-slate-600 text-[8px] px-2 py-1 rounded font-black uppercase">NO</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => handleDelete(g.id)} className="text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                    )}
+          {!selectedCategory ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+              {loading ? <p className="text-xs font-bold uppercase text-slate-400">Cargando...</p> : categoryKeys.map(cat => {
+                const groupsInCat = groupedGrupos[cat];
+                const totalAlumnas = groupsInCat.reduce((sum, g) => sum + (alumnasPorGrupo[g.id] || 0), 0);
+                return (
+                  <div key={cat} onClick={() => setSelectedCategory(cat)} className="bg-white flex flex-col p-8 rounded-2xl shadow-sm border border-slate-200 hover:border-purple-400 hover:shadow-md transition-all group cursor-pointer text-center relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-purple-500"></div>
+                    <h3 className="text-2xl font-black uppercase tracking-tight text-slate-800 mb-2">{cat}</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase mb-4">{groupsInCat.length} Grupos disponibles</p>
+                    <div className="mt-auto inline-flex items-center justify-center gap-2 text-purple-600 bg-purple-50 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest mx-auto">
+                      <Users className="w-4 h-4" /> {totalAlumnas} ALUMNAS EN TOTAL
+                    </div>
                   </div>
-                </div>
-                <p className="text-[11px] text-slate-600 font-bold uppercase mt-4 mb-2">{g.horario}</p>
-                <div className="mt-auto border-t border-slate-100 pt-4 flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                  <button onClick={() => setManagingGroup(g)} className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
-                    <Users className="w-3.5 h-3.5" /> {alumnasPorGrupo[g.id] || 0} ALUMNAS
-                  </button>
-                  <button onClick={() => printAsistencia(g.id, g.nombre, g.horario)} className="flex items-center gap-1.5 text-purple-600 hover:text-purple-800">
-                    <Printer className="w-3.5 h-3.5" /> IMPRIMIR
-                  </button>
-                </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex justify-between items-center mb-6">
+                <button onClick={() => setSelectedCategory(null)} className="flex items-center gap-2 text-slate-500 hover:text-purple-600 font-bold text-xs uppercase tracking-widest transition-colors bg-white px-4 py-2 rounded-xl border border-slate-200 hover:border-purple-300 shadow-sm">
+                  ← VOLVER A GRUPOS
+                </button>
+                <h3 className="text-xl font-black uppercase tracking-tight text-purple-900 bg-purple-100 px-4 py-2 rounded-xl">
+                  {selectedCategory}
+                </h3>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {groupedGrupos[selectedCategory].map(g => (
+                  <div key={g.id} className="bg-white flex flex-col p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-purple-300 transition-all group">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-sm font-black uppercase tracking-tight px-3 py-1 rounded bg-purple-50 text-purple-900">{g.nombre}</h3>
+                      <div className="flex gap-2 transition-opacity">
+                        <button onClick={() => handleVaciarGrupo(g.id)} title="Vaciar Grupo" className="text-slate-400 hover:text-amber-600 transition-colors">
+                           <UserMinus className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => { setIsEditing(g); setForm(g); }} className="text-slate-400 hover:text-purple-600"><Edit className="w-4 h-4" /></button>
+                        {deleteConfirmId === g.id ? (
+                          <div className="flex gap-1 items-center bg-red-50 p-1 rounded">
+                            <button onClick={() => handleDelete(g.id, true)} className="bg-red-600 text-white text-[8px] px-2 py-1 rounded font-black uppercase">SÍ</button>
+                            <button onClick={() => setDeleteConfirmId(null)} className="bg-slate-200 text-slate-600 text-[8px] px-2 py-1 rounded font-black uppercase">NO</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => handleDelete(g.id)} className="text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-bold uppercase mt-4 mb-2">{g.horario}</p>
+                    <div className="mt-auto border-t border-slate-100 pt-4 flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                      <button onClick={() => setManagingGroup(g)} className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
+                        <Users className="w-3.5 h-3.5" /> {alumnasPorGrupo[g.id] || 0} ALUMNAS
+                      </button>
+                      <button onClick={() => printAsistencia(g.id, g.nombre, g.horario)} className="flex items-center gap-1.5 text-purple-600 hover:text-purple-800">
+                        <Printer className="w-3.5 h-3.5" /> IMPRIMIR
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-300">

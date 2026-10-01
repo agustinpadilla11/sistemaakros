@@ -28,66 +28,18 @@ export default function AdminDashboard() {
   const [isSending, setIsSending] = useState(false);
   const [showTodayPaymentsModal, setShowTodayPaymentsModal] = useState(false);
   const [cuotasHoy, setCuotasHoy] = useState<any[]>([]);
+  const [exportMonth, setExportMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
 
   useEffect(() => {
     async function loadStats() {
       const alumnasSnap = await getDocs(collection(db, 'alumnas'));
       let activas = 0;
-      let pendientesCount = 0;
-      let aptosXVencer = 0;
       const today = new Date();
-      const in30Days = addDays(today, 30);
       
-      const vencidas: any[] = [];
-      const pendingTemp: any[] = [];
-
       alumnasSnap.forEach(doc => {
-        const data = doc.data();
-        if (data.estado === 'activa') activas++;
-        if (data.estado === 'pendiente_aprobacion') {
-          pendientesCount++;
-          pendingTemp.push({ id: doc.id, ...data });
-        }
-        
-        if (data.estado === 'activa' && data.fecha_apto_medico) {
-          const aptoDate = data.fecha_apto_medico.toDate();
-          const fechaVencimiento = addDays(aptoDate, 365); 
-          if (isBefore(fechaVencimiento, in30Days)) {
-            aptosXVencer++;
-            vencidas.push({ id: doc.id, ...data, aptoDate, fechaVencimiento });
-          }
-        } else if (data.estado === 'activa' && !data.fecha_apto_medico) {
-           aptosXVencer++;
-           vencidas.push({ id: doc.id, ...data, aptoDate: null, fechaVencimiento: null });
-        }
+        if (doc.data().estado === 'activa') activas++;
       });
       
-      setAlumnasVencidas(vencidas.sort((a, b) => {
-         if (!a.fechaVencimiento) return -1;
-         if (!b.fechaVencimiento) return 1;
-         return a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime();
-      }));
-
-      setPendientesList(pendingTemp);
-
-      const cuotasSnap = await getDocs(query(
-        collection(db, 'cuotas'),
-        where('mes', '==', today.getMonth() + 1),
-        where('anio', '==', today.getFullYear())
-      ));
-
-      let unpaidCount = 0;
-      let unpaidAmt = 0;
-
-      cuotasSnap.forEach(doc => {
-        const data = doc.data();
-        if (data.estado === 'pendiente' || data.estado === 'vencido') {
-          unpaidCount++;
-          unpaidAmt += data.monto;
-        }
-      });
-
-      // Fetch paid cuotas for today list modal and month count
       const paidCuotasSnap = await getDocs(query(
         collection(db, 'cuotas'),
         where('estado', '==', 'pagado')
@@ -125,40 +77,15 @@ export default function AdminDashboard() {
         }
       });
 
-      setStats({
+      setStats(prev => ({
+        ...prev,
         totalActivas: activas,
         cuotasMesPagadas: pagadasCountMes,
-        cuotasHoyPagadas: pagadasCountHoy,
-        cuotasMesPendientesCount: unpaidCount,
-        cuotasMesPendientesAmt: unpaidAmt,
-        aptosPorVencer: aptosXVencer,
-        pendientesAprobacion: pendientesCount
-      });
+        cuotasHoyPagadas: pagadasCountHoy
+      }));
+      
       cuotasHoyTemp.sort((a, b) => b.fechaPagoDate.getTime() - a.fechaPagoDate.getTime());
       setCuotasHoy(cuotasHoyTemp);
-
-      const unpaidSnap = await getDocs(query(
-        collection(db, 'cuotas'),
-        where('estado', '!=', 'pagado')
-      ));
-
-      const alerts: any[] = [];
-      unpaidSnap.forEach(d => {
-         const c = d.data();
-         const alu = alumnasSnap.docs.find(a => a.id === c.alumna_id)?.data();
-         if (!alu || alu.estado !== 'activa') return;
-
-         const isCurrentMonth = c.mes === (today.getMonth() + 1) && c.anio === today.getFullYear();
-         const isPastMonth = c.anio < today.getFullYear() || (c.anio === today.getFullYear() && c.mes < (today.getMonth() + 1));
-         
-         if (isCurrentMonth && today.getDate() > 15) {
-            alerts.push({ id: d.id, ...c, alumnaNombre: alu.nombre_completo, alumnaEmail: alu.email_contacto, severity: 'yellow', label: 'Cuota Mes Actual (Atrasada)' });
-         } else if (isPastMonth) {
-            alerts.push({ id: d.id, ...c, alumnaNombre: alu.nombre_completo, alumnaEmail: alu.email_contacto, severity: 'red', label: `Deuda Mes ${c.mes}/${c.anio}` });
-         }
-      });
-
-      setAlertasPago(alerts.sort((a, b) => (a.severity === 'red' ? -1 : 1)));
     }
     loadStats();
   }, []);
@@ -222,9 +149,11 @@ export default function AdminDashboard() {
 
   const handleExportarMes = async () => {
     try {
-      const today = new Date();
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+      const [yearStr, monthStr] = exportMonth.split('-');
+      const year = parseInt(yearStr, 10);
+      const monthNum = parseInt(monthStr, 10);
+      const monthStart = new Date(year, monthNum - 1, 1);
+      const monthEnd = new Date(year, monthNum, 0, 23, 59, 59, 999);
       
       const paidCuotasSnap = await getDocs(query(
         collection(db, 'cuotas'),
@@ -309,7 +238,7 @@ export default function AdminDashboard() {
       const ws = XLSX.utils.json_to_sheet(pagosDelMes);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Resumen del Mes");
-      XLSX.writeFile(wb, `Resumen_Ingresos_Cuotas_${format(today, 'MM_yyyy')}.xlsx`);
+      XLSX.writeFile(wb, `Resumen_Ingresos_Cuotas_${monthStr}_${yearStr}.xlsx`);
 
     } catch (e) {
       console.error(e);
@@ -325,7 +254,13 @@ export default function AdminDashboard() {
           <h1 className="text-xl lg:text-2xl font-black text-slate-800 uppercase tracking-tight">Panel de Control</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Resumen general y alertas del sistema</p>
         </div>
-        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 items-center">
+           <input 
+             type="month" 
+             value={exportMonth}
+             onChange={(e) => setExportMonth(e.target.value)}
+             className="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white"
+           />
            <button 
              onClick={handleExportarMes} 
              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest text-white hover:bg-emerald-700 transition-colors shadow-sm"
@@ -344,27 +279,13 @@ export default function AdminDashboard() {
       </div>
 
       {/* TARJETAS DE ESTADISTICAS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         <StatCard 
           title="Total Alumnas"
           value={stats.totalActivas}
           subtitle="Activas en el sistema"
           subColor="text-purple-600"
           borderColor="border-slate-200"
-        />
-        <StatCard 
-          title="Pendientes (Insc.)"
-          value={stats.pendientesAprobacion}
-          subtitle="Nuevas solicitudes"
-          subColor="text-purple-600"
-          borderColor="border-l-purple-600"
-        />
-        <StatCard 
-          title="Aptos Médicos x Vencer"
-          value={stats.aptosPorVencer}
-          subtitle="Revisar"
-          subColor="text-amber-600 font-bold"
-          borderColor="border-l-amber-500"
         />
         <StatCard 
           title="Cuotas Cobradas"
@@ -377,163 +298,7 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* SECCIÓN PENDIENTES - PRIORIDAD ALTA */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 lg:p-5 border-b border-slate-100 flex items-center bg-purple-50">
-          <Users className="w-5 h-5 text-purple-600 mr-2" />
-          <h3 className="font-bold text-[10px] lg:text-sm uppercase tracking-tight text-slate-800">Solicitudes Pendientes de Aprobación</h3>
-          <span className="ml-2 lg:ml-3 bg-purple-600 text-white text-[9px] lg:text-[10px] font-black px-2 py-0.5 rounded-full">{pendientesList.length}</span>
-        </div>
-        <div className="overflow-x-auto">
-          {pendientesList.length > 0 ? (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-500">
-                  <th className="p-4 font-bold">Gimnasta</th>
-                  <th className="p-4 font-bold">DNI</th>
-                  <th className="p-4 font-bold text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {pendientesList.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4">
-                      <p className="font-bold text-slate-800 uppercase text-xs">{p.nombre_completo}</p>
-                    </td>
-                    <td className="p-4 text-xs font-medium text-slate-500">
-                      {p.dni}
-                    </td>
-                    <td className="p-4 text-right">
-                      <Link 
-                        to={`/admin/alumnas/${p.id}`} 
-                        className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-bold uppercase text-[10px] tracking-widest underline"
-                      >
-                        Ver Datos y Validar
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-              No hay solicitudes pendientes de aprobación en este momento.
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* ALERTAS APTOS MEDICOS */}
-      {alumnasVencidas.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center bg-amber-50/50 gap-3">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-amber-500 mr-2" />
-                <h3 className="font-bold text-[10px] lg:text-sm uppercase tracking-tight text-slate-800">Alertas: Certificados Médicos</h3>
-              </div>
-              <div className="w-full sm:w-auto sm:ml-auto">
-                 <button 
-                    onClick={handleAutoSendAll}
-                    disabled={isSending}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[10px] font-bold uppercase tracking-widest transition-colors shadow-sm"
-                 >
-                    <Mail className="w-4 h-4" />
-                    {isSending ? 'Enviando Avisos...' : 'Avisar Certificados'}
-                 </button>
-              </div>
-            </div>
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-500">
-                    <th className="p-4 font-bold">Gimnasta</th>
-                    <th className="p-4 font-bold">Estado Apto</th>
-                    <th className="p-4 font-bold text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {alumnasVencidas.map(a => (
-                    <tr key={a.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4">
-                        <p className="font-bold text-slate-800 uppercase text-xs">{a.nombre_completo}</p>
-                      </td>
-                      <td className="p-4">
-                        {a.fechaVencimiento ? (
-                           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${isBefore(a.fechaVencimiento, new Date()) ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {isBefore(a.fechaVencimiento, new Date()) ? 'Vencido (' : 'Vence ('}
-                              {format(a.fechaVencimiento, "d 'de' MMMM, yyyy", { locale: es })}
-                              )
-                           </span>
-                        ) : (
-                           <span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600">Sin cargar</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right">
-                        <button onClick={() => composeEmail(a, 'apto')} disabled={!a.email_contacto} className="text-amber-600 hover:text-amber-800 transition-colors"><Mail className="w-4 h-4"/></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-      )}
-
-      {/* ALERTAS PAGOS */}
-      {alertasPago.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center bg-slate-50">
-              <DollarSign className="w-5 h-5 text-slate-800 mr-2" />
-              <h3 className="font-bold text-sm uppercase tracking-tight text-slate-800">Alertas de Pago y Morosidad</h3>
-            </div>
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-500">
-                    <th className="p-4 font-bold">Gimnasta</th>
-                    <th className="p-4 font-bold">Detalle de Deuda</th>
-                    <th className="p-4 font-bold">Monto</th>
-                    <th className="p-4 font-bold text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {alertasPago.map(a => (
-                    <tr key={a.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4">
-                        <p className="font-bold text-slate-800 uppercase text-xs">{a.alumnaNombre}</p>
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
-                          a.severity === 'red' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {a.label}
-                        </span>
-                      </td>
-                      <td className="p-4 text-xs font-bold text-slate-600">${a.monto}</td>
-                      <td className="p-4 text-right">
-                         <button 
-                           onClick={() => composeEmail(a, 'pago', a.label)} 
-                           disabled={!a.alumnaEmail}
-                           className={`p-2 rounded-full transition-colors ${a.severity === 'red' ? 'text-red-600 hover:bg-red-50' : 'text-yellow-600 hover:bg-yellow-50'}`}
-                         >
-                            <Mail className="w-4 h-4" />
-                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-      )}
-
-      {/* FOOTER PLACEHOLDER */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[150px] flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-slate-400 font-medium mb-2">Aquí puedes visualizar próximos reportes o gráficos.</p>
-          <p className="text-xs text-slate-300 uppercase tracking-widest font-bold">En desarrollo</p>
-        </div>
-      </div>
 
       {/* MODAL CUOTAS DE HOY */}
       {showTodayPaymentsModal && (
