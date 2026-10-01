@@ -682,20 +682,52 @@ export function useCajaDiaria() {
 
     const dataEgresos = egresos.map(e => ({ Fecha: toDate(e.fecha).toLocaleDateString('es-AR'), Concepto: e.concepto.toUpperCase(), Metodo: e.metodo.toUpperCase(), Monto: e.monto }));
     
-    const tE = sumMonto(dataIngresos.filter(i => i.Metodo === 'EFECTIVO'));
-    const tD = sumMonto(dataIngresos.filter(i => i.Metodo === 'DEBITO'));
-    const tT = sumMonto(dataIngresos.filter(i => i.Metodo.includes('TRANSF') || i.Metodo === 'MP' || i.Metodo.includes('MERCADO')));
-    const tEgr = dataEgresos.reduce((a,b) => a + b.Monto, 0);
+    const sumBy = (arr: any[], metodo: string[], tipo?: string[]) => {
+      return arr.filter(i => {
+        const matchMetodo = metodo.some(m => i.Metodo.includes(m));
+        const matchTipo = tipo ? tipo.some(t => i.Tipo === t) : true;
+        return matchMetodo && matchTipo;
+      }).reduce((sum, item) => sum + (item.Monto || 0), 0);
+    };
+
+    const metodos = {
+      EFECTIVO: ['EFECTIVO'],
+      DEBITO: ['DEBITO'],
+      TRANSF: ['TRANSF', 'MP', 'MERCADO']
+    };
+
+    const tipos = {
+      CUOTAS: ['CUOTA'],
+      KIOSKO: ['INDUMENTARIA/KIOSKO'],
+      OTROS: ['OTRO', 'FEDERACION', 'INSCRIPCION', 'SEGURO', 'TORNEO INTERNO']
+    };
 
     const dataResumen = [
-      { Categoria: 'INGRESOS EFECTIVO', Monto: tE },
-      { Categoria: 'INGRESOS DEBITO', Monto: tD },
-      { Categoria: 'INGRESOS TRANSFERENCIA/MP', Monto: tT },
+      { Categoria: '💵 INGRESOS EFECTIVO', Monto: '' },
+      { Categoria: '   - Cuotas', Monto: sumBy(dataIngresos, metodos.EFECTIVO, tipos.CUOTAS) },
+      { Categoria: '   - Indumentaria/Kiosko', Monto: sumBy(dataIngresos, metodos.EFECTIVO, tipos.KIOSKO) },
+      { Categoria: '   - Inscripciones/Seguros/Torneos/Otros', Monto: sumBy(dataIngresos, metodos.EFECTIVO, tipos.OTROS) },
+      { Categoria: '✅ TOTAL EFECTIVO', Monto: sumBy(dataIngresos, metodos.EFECTIVO) },
       { Categoria: '', Monto: '' },
-      { Categoria: 'TOTAL INGRESOS', Monto: tE + tD + tT },
-      { Categoria: 'TOTAL EGRESOS (SE SACO DE CAJA)', Monto: tEgr },
+      { Categoria: '💳 INGRESOS DÉBITO', Monto: '' },
+      { Categoria: '   - Cuotas', Monto: sumBy(dataIngresos, metodos.DEBITO, tipos.CUOTAS) },
+      { Categoria: '   - Indumentaria/Kiosko', Monto: sumBy(dataIngresos, metodos.DEBITO, tipos.KIOSKO) },
+      { Categoria: '   - Inscripciones/Seguros/Torneos/Otros', Monto: sumBy(dataIngresos, metodos.DEBITO, tipos.OTROS) },
+      { Categoria: '✅ TOTAL DÉBITO', Monto: sumBy(dataIngresos, metodos.DEBITO) },
       { Categoria: '', Monto: '' },
-      { Categoria: 'BALANCE NETO', Monto: (tE + tD + tT) - tEgr }
+      { Categoria: '🏦 INGRESOS TRANSFERENCIAS/MP', Monto: '' },
+      { Categoria: '   - Cuotas', Monto: sumBy(dataIngresos, metodos.TRANSF, tipos.CUOTAS) },
+      { Categoria: '   - Indumentaria/Kiosko', Monto: sumBy(dataIngresos, metodos.TRANSF, tipos.KIOSKO) },
+      { Categoria: '   - Inscripciones/Seguros/Torneos/Otros', Monto: sumBy(dataIngresos, metodos.TRANSF, tipos.OTROS) },
+      { Categoria: '✅ TOTAL TRANSFERENCIAS/MP', Monto: sumBy(dataIngresos, metodos.TRANSF) },
+      { Categoria: '', Monto: '' },
+      { Categoria: '==============================', Monto: '' },
+      { Categoria: '💰 TOTAL INGRESOS GENERAL', Monto: sumBy(dataIngresos, [...metodos.EFECTIVO, ...metodos.DEBITO, ...metodos.TRANSF]) },
+      { Categoria: '==============================', Monto: '' },
+      { Categoria: '', Monto: '' },
+      { Categoria: '🔻 TOTAL EGRESOS (SALIDAS DE CAJA)', Monto: dataEgresos.reduce((a, b) => a + (b.Monto || 0), 0) },
+      { Categoria: '', Monto: '' },
+      { Categoria: '⚖️ BALANCE NETO FINAL', Monto: sumBy(dataIngresos, [...metodos.EFECTIVO, ...metodos.DEBITO, ...metodos.TRANSF]) - dataEgresos.reduce((a, b) => a + (b.Monto || 0), 0) }
     ];
 
     const wb = XLSX.utils.book_new();
@@ -829,7 +861,15 @@ export function useCajaDiaria() {
         for (let R = range.s.r + 1; R <= range.e.r; ++R) {
           for (let C = range.s.c; C <= range.e.c; ++C) {
             const cell = ws[XLSX.utils.encode_cell({c: C, r: R})];
-            if (cell && cell.t === 'n') cell.z = '"$"#,##0.00';
+            if (cell && cell.t === 'n') {
+              if (C === 1) {
+                // Monto column (B)
+                cell.z = '"$"#,##0.00';
+              } else {
+                // Cantidad de Pagos column (C) or others
+                cell.z = '0';
+              }
+            }
           }
         }
         return ws;
