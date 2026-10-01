@@ -10,10 +10,11 @@ import { saveAs } from 'file-saver';
 export default function Alumnas() {
   const [alumnas, setAlumnas] = useState<any[]>([]);
   const [bajas, setBajas] = useState<any[]>([]);
+  const [cuotas, setCuotas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('activa');
-  const [activeSubTab, setActiveSubTab] = useState<'listado' | 'altas' | 'bajas'>('listado');
+  const [activeSubTab, setActiveSubTab] = useState<'listado' | 'altas' | 'bajas' | 'deudoras'>('listado');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [statusConfirmId, setStatusConfirmId] = useState<{id: string, nuevoEstado: string} | null>(null);
 
@@ -26,6 +27,9 @@ export default function Alumnas() {
 
       const bajasSnap = await getDocs(collection(db, 'bajas'));
       setBajas(bajasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      const cuotasSnap = await getDocs(collection(db, 'cuotas'));
+      setCuotas(cuotasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       console.error("Error loading alumnas", err);
     } finally {
@@ -142,6 +146,51 @@ export default function Alumnas() {
       d.setMonth(d.getMonth() + 1);
     }
     return d;
+  };
+
+  const getDeudorasList = () => {
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1; 
+    const currentYear = today.getFullYear();
+    
+    let maxMonth;
+    if (today.getDate() > 15) {
+      maxMonth = currentMonth;
+    } else {
+      maxMonth = currentMonth - 1;
+    }
+
+    const deudoras: any[] = [];
+    const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    alumnas.filter(a => a.estado === 'activa').forEach(alu => {
+      const aluCuotas = cuotas.filter(c => c.alumna_id === alu.id && c.anio === currentYear);
+      const mesesAdeudados: { mes: string, monto: number }[] = [];
+      let deudaTotal = 0;
+
+      // Start from June as requested previously for 2026, or Jan for future years
+      const startMonth = currentYear === 2026 ? 6 : 1;
+
+      for (let i = startMonth; i <= maxMonth; i++) {
+        const c = aluCuotas.find(x => x.mes === i);
+        if (!c || c.estado !== 'pagado') {
+          const montoDeuda = c && c.monto ? Number(c.monto) : 0; 
+          mesesAdeudados.push({ mes: MESES[i - 1], monto: montoDeuda });
+          deudaTotal += montoDeuda;
+        }
+      }
+
+      if (mesesAdeudados.length > 0) {
+        deudoras.push({
+          nombre: alu.nombre_completo,
+          meses: mesesAdeudados.map(m => m.mes).join(', '),
+          deudaTotal,
+          cantidadMeses: mesesAdeudados.length
+        });
+      }
+    });
+
+    return deudoras.sort((a, b) => b.cantidadMeses - a.cantidadMeses || a.nombre.localeCompare(b.nombre));
   };
 
   const getBajasPorMes = () => {
@@ -327,6 +376,12 @@ export default function Alumnas() {
           className={`flex-1 lg:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'bajas' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
         >
           Bajas por Mes
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('deudoras')}
+          className={`flex-1 lg:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'deudoras' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          Deudoras Activas
         </button>
       </div>
 
@@ -572,6 +627,47 @@ export default function Alumnas() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {activeSubTab === 'deudoras' && (
+        <div className="space-y-6">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-red-200">
+            <h3 className="text-sm font-black uppercase tracking-tight text-red-600 mb-2">Deudoras Activas (Cuotas)</h3>
+            <p className="text-xs text-slate-500 font-bold mb-4">
+              Muestra a todas las alumnas actualmente "activas" que tengan cuotas del año en curso en estado pendiente o que no tengan cuotas registradas para meses pasados.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-[10px] uppercase text-slate-400 tracking-wider bg-slate-50 border-y border-slate-100">
+                    <th className="px-6 py-3 font-black">Gimnasta</th>
+                    <th className="px-6 py-3 font-black">Meses Adeudados</th>
+                    <th className="px-6 py-3 font-black">Cantidad</th>
+                    <th className="px-6 py-3 font-black text-right">Deuda Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr><td colSpan={4} className="px-6 py-8 text-center text-xs text-slate-500 font-bold uppercase">Cargando...</td></tr>
+                  ) : getDeudorasList().length === 0 ? (
+                    <tr><td colSpan={4} className="px-6 py-8 text-center text-xs text-emerald-600 font-bold uppercase">¡No hay deudoras activas!</td></tr>
+                  ) : (
+                    getDeudorasList().map((d, idx) => (
+                      <tr key={idx} className="hover:bg-red-50/30 transition-colors">
+                        <td className="px-6 py-4 text-xs font-black uppercase text-slate-800">{d.nombre}</td>
+                        <td className="px-6 py-4 text-[10px] font-bold text-red-500 uppercase">{d.meses}</td>
+                        <td className="px-6 py-4 text-xs font-black text-slate-600">{d.cantidadMeses}</td>
+                        <td className="px-6 py-4 text-xs font-black text-red-600 text-right">
+                          {d.deudaTotal > 0 ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(d.deudaTotal) : 'S/D (Monto manual)'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
